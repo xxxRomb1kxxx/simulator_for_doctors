@@ -1,0 +1,11 @@
+aiogram~=3.22.0
+python-dotenv~=1.1.1
+requests~=2.32.5
+langchain~=0.3.27
+langchain-core~=0.3.74
+pydub~=0.25.1
+langchain-community~=0.3.28
+urllib3~=2.5.0
+langgraph~=0.6.6
+sqlalchemy~=2.0.43
+aiosqlite~=0.21.0
