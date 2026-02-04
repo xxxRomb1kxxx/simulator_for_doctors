@@ -27,15 +27,11 @@ git clone https://github.com/ваш_репозиторий/tg_bot_patient.git
 cd tg_bot_patient
 Установите зависимости:
 
-bash
-Копировать код
 pip install -r requirements.txt
 Настройте API-ключи и конфигурацию в config/settings.py.
 
 Запустите бота:
 
-bash
-Копировать код
 python main.py
 🗂 Структура проекта
 ⭐ Точка входа
@@ -118,4 +114,16 @@ logger.py — Логирование
 
 🔄 Как всё работает
 
-Пользователь ↓ Telegram Bot ↓ Controllers ↓ Services (FSM / GigaChat / Validation) ↓ Models & Database ↓ Views ↓ Ответ пользователю
+Пользователь 
+     ↓
+Telegram Bot
+     ↓
+ Controllers
+     ↓
+Services (FSM / GigaChat / Validation)
+     ↓
+Models & Database
+     ↓
+   Views
+     ↓
+Ответ пользователю
