@@ -1,17 +1,18 @@
-# This is a sample Python script.
+import asyncio
+from aiogram import Bot, Dispatcher
 
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
+from config.settings import BOT_TOKEN
+from controllers.handlers import menu, training, dialog
 
+async def main():
+    bot = Bot(BOT_TOKEN)
+    dp = Dispatcher()
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press ⌘F8 to toggle the breakpoint.
+    dp.include_router(menu.router)
+    dp.include_router(training.router)
+    dp.include_router(dialog.router)
 
+    await dp.start_polling(bot)
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
-
+if __name__ == "__main__":
+    asyncio.run(main())

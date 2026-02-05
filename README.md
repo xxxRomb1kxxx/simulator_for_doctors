@@ -1,4 +1,4 @@
-# 🏥 tg_bot_patient 🤖
+# 🏥 tg_bot_patient @bfu_patient_bot
 
 **Интеллектуальный Telegram-бот для диалога с пациентом**
 
@@ -6,124 +6,30 @@
 
 ---
 
-## ✨ Ключевые возможности
+bot/
+├── app/
+│   ├── handlers/
+│   │   ├── menu.py
+│   │   ├── training.py
+│   │   └── dialog.py
+│   ├── keyboards/
+│   │   └── inline.py
+│   └── states/
+│       └── dialog.py
+│
+├── models/
+│   ├── entities/
+│   │   ├── patient.py
+│   │   ├── disease.py
+│   │   └── medical_card.py
+│   └── intents/
+│       └── intents.py
+│
+├── services/
+│   ├── patient_factory.py
+│   ├── dialog_engine.py
+│   └── diagnosis_checker.py
+│
+├── config.py
+└── main.py
 
-- ⭐ Интерактивный диалог с пациентом  
-- 🩺 Первичная диагностика заболеваний  
-- 📋 Формирование медицинской карты  
-- 🔁 FSM для управления сценариями общения  
-- 🤖 Интеграция с GigaChat API  
-- ✅ Проверка и валидация диагнозов  
-- 🗄️ Хранение данных через ORM  
-
----
-
-## 🚀 Установка и запуск
-
-1. Клонируйте репозиторий:
-
-```bash
-git clone https://github.com/ваш_репозиторий/tg_bot_patient.git
-cd tg_bot_patient
-Установите зависимости:
-
-pip install -r requirements.txt
-Настройте API-ключи и конфигурацию в config/settings.py.
-
-Запустите бота:
-
-python main.py
-🗂 Структура проекта
-⭐ Точка входа
-main.py
-▶️ Запуск приложения, инициализация сервисов, подключение базы данных.
-
-⚙️ Конфигурация
-config/
-
-settings.py — Настройки бота и API-ключи
-
-constants.py — Тексты, медицинские константы
-
-🧠 Бизнес-модели
-models/
-
-patient.py — Данные пациента
-
-medical_card.py — Медицинская карта
-
-disease.py — Справочник заболеваний
-
-user.py — Пользователь Telegram
-
-session.py — Сессия пользователя
-
-🎨 UI-слой (представления)
-views/
-
-keyboards.py — Telegram-клавиатуры
-
-templates.py — Шаблоны сообщений
-
-medical_card_view.py — Отображение медицинской карты
-
-dialog_view.py — Ведение диалога
-
-🧩 Контроллеры (бизнес-логика)
-controllers/
-
-main_controller.py — Маршрутизация команд
-
-training_controller.py — Сценарии обучения
-
-dialog_controller.py — Управление диалогом
-
-diagnosis_controller.py — Диагностика
-
-medical_card_controller.py — Работа с медкартой
-
-⚡ Сервисный слой
-services/
-
-llm_service.py — Работа с GigaChat API
-
-state_service.py — FSM и состояния
-
-validator.py — Валидация диагнозов
-
-🗄️ База данных
-database/
-
-db.py — Инициализация БД
-
-models.py — ORM (SQLAlchemy)
-
-🔁 FSM-состояния
-states/
-
-training_states.py
-
-dialog_states.py
-
-🛠 Утилиты
-utils/
-
-helpers.py — Вспомогательные функции
-
-logger.py — Логирование
-
-🔄 Как всё работает
-
-Пользователь 
-     ↓
-Telegram Bot
-     ↓
- Controllers
-     ↓
-Services (FSM / GigaChat / Validation)
-     ↓
-Models & Database
-     ↓
-   Views
-     ↓
-Ответ пользователю
