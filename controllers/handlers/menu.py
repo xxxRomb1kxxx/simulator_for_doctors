@@ -8,4 +8,4 @@ router = Router()
 
 @router.message(Command("start"))
 async def start(msg: Message):
-    await msg.answer("👋 Симулятор врача", reply_markup=main_menu())
+    await msg.answer("Симулятор врача", reply_markup=main_menu())

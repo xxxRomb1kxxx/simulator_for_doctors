@@ -13,7 +13,7 @@ async def dialog(msg: Message, state: FSMContext):
     engine = data["engine"]
 
     answer = engine.process(msg.text)
-    await msg.answer(f"🧍‍♂️ Пациент: {answer}")
+    await msg.answer(f"️Пациент: {answer}")
 
     if "Какой у меня диагноз" in answer:
         await state.set_state(DialogState.waiting_diagnosis)
