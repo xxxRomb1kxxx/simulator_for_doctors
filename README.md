@@ -5,31 +5,36 @@
 💡 Проект предназначен для ведения диалога с пациентом, первичной диагностики и формирования медицинской карты с использованием **GigaChat** и **FSM-архитектуры**.
 
 ---
-
-bot/
-├── app/
-│   ├── handlers/
-│   │   ├── menu.py
-│   │   ├── training.py
-│   │   └── dialog.py
-│   ├── keyboards/
-│   │   └── inline.py
-│   └── states/
-│       └── dialog.py
+tg_bot_patient/
 │
-├── models/
-│   ├── entities/
-│   │   ├── patient.py
-│   │   ├── disease.py
-│   │   └── medical_card.py
-│   └── intents/
-│       └── intents.py
+├── bot/
+│   ├── controllers/
+│   │   ├── handlers/
+│   │   │   ├── menu.py          # Обработчики основного меню
+│   │   │   ├── training.py      # Обработчики тренировки/обучения
+│   │   │   └── dialog.py        # Обработчики диалога с пациентом
+│   │   │
+│   │   ├── keyboards/
+│   │   │   └── inline.py        # Инлайн-клавиатуры бота
+│   │   │
+│   │   └── states/
+│   │       └── dialog.py        # Состояния FSM для диалога
+│   │
+│   ├── models/
+│   │   ├── entities/
+│   │   │   ├── patient.py       # Модель пациента
+│   │   │   ├── disease.py       # Модель заболевания
+│   │   │   └── medical_card.py  # Модель медицинской карты
+│   │   │
+│   │   └── intents/
+│   │       └── intents.py       # Определения интентов диалога
+│   │
+│   ├── services/
+│   │   ├── patient_factory.py   # Фабрика создания пациентов
+│   │   ├── dialog_engine.py     # Движок диалога (интеграция с GigaChat)
+│   │   └── diagnosis_checker.py # Проверка диагнозов
+│   │
+│   ├── config.py                # Конфигурация приложения
+│   └── main.py                  # Точка входа в приложение
 │
-├── services/
-│   ├── patient_factory.py
-│   ├── dialog_engine.py
-│   └── diagnosis_checker.py
-│
-├── config.py
-└── main.py
-
+└── README.md                    # Документация проекта
