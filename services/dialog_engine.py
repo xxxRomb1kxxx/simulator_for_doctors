@@ -4,7 +4,7 @@ class DialogEngine:
     def __init__(self, patient, card):
         self.patient = patient
         self.card = card
-        self.stage = "greeting"  # 👈 ВАЖНО
+        self.stage = "greeting"
 
     def process(self, text: str) -> str:
         text = text.lower()
