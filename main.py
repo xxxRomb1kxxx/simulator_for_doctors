@@ -1,11 +1,11 @@
 import asyncio
 from aiogram import Bot, Dispatcher
 
-from config.settings import BOT_TOKEN
+from config.settings import settings
 from controllers.handlers import menu, training, dialog
 
 async def main():
-    bot = Bot(BOT_TOKEN)
+    bot = Bot(settings.BOT_TOKEN)
     dp = Dispatcher()
 
     dp.include_router(menu.router)

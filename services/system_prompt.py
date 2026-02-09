@@ -114,9 +114,3 @@ class SystemPromptGenerator:
 Помни: ты реальный человек, который пришёл к врачу за помощью. 
 Ты хочешь получить точный диагноз и лечение, поэтому стараешься чётко описать свои симптомы.
 """
-
-
-# Альтернативно, можно добавить функцию для удобства импорта
-def get_system_prompt(disease_name: str, complaints: list) -> str:
-    """Упрощённый интерфейс для получения промпта"""
-    return SystemPromptGenerator.get_system_prompt(disease_name, complaints)

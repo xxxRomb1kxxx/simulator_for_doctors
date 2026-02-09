@@ -3,7 +3,7 @@ from langchain_gigachat import GigaChat
 from langchain_core.messages import HumanMessage, SystemMessage
 from services.system_prompt import SystemPromptGenerator
 from models.entities.patient import Patient
-
+from config.settings import settings
 
 class DialogEngine:
     def __init__(self, patient: Patient, card):
@@ -17,8 +17,10 @@ class DialogEngine:
         )
 
         self.llm = GigaChat(
-            credentials="NjI3MzZiNmMtOWY3OS00MjNkLWEyOWUtYWMzZjk0ODYyMWI2OjRlZWM1N2Y1LWY4N2YtNDdiMi05OWZlLWZlNmYwYTFkY2YxMw==",
-            scope="GIGACHAT_API_PERS",
+            #credentials="NjI3MzZiNmMtOWY3OS00MjNkLWEyOWUtYWMzZjk0ODYyMWI2OjRlZWM1N2Y1LWY4N2YtNDdiMi05OWZlLWZlNmYwYTFkY2YxMw==",
+            credentials=settings.GIGA_CREDENTIALS,
+            #scope="GIGACHAT_API_PERS",
+            scope=settings.SCOPE,
             model="GigaChat",
             verify_ssl_certs=False,
             temperature=0.7,
@@ -71,10 +73,8 @@ class DialogEngine:
         elif intent == "diagnosis":
             response = "Я не врач, чтобы ставить диагноз. По моим симптомам - сильная жажда, частое мочеиспускание, слабость. Как вы думаете, что это может быть?"
 
-            # Можно добавить более эмоциональную реакцию:
-            # response = "Доктор, я очень переживаю! У меня такие странные симптомы: постоянно хочется пить, бегаю в туалет каждые полчаса, совсем нет сил. Что это может быть? Я боюсь, что это что-то серьёзное..."
 
-        self.dialog_history.append(f"Пациент: {response}")
+        self.dialog_history.append(f"{response}")
         return response
     def _enrich_with_experience(self, category: str) -> str:
         """Добавляет субъективный опыт пациента в зависимости от болезни"""
