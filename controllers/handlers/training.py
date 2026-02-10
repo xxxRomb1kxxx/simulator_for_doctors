@@ -6,7 +6,7 @@ from controllers.keyboards.inline import training_menu
 from controllers.states.dialog import DialogState
 from services.patient_factory import create_patient
 from models.entities.medical_card import MedicalCard
-from services.dialog_engine import DialogEngine
+from dialog_engine.dialog_engine import DialogEngine
 from models.entities.disease import DiseaseType
 
 router = Router()
