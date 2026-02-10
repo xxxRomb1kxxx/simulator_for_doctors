@@ -5,7 +5,6 @@ from config.settings import settings
 
 
 class LLMResponseGenerator:
-    """Класс для генерации ответов через LLM"""
 
     def __init__(self, disease_name: str, complaints: list):
         self.system_prompt = SystemPromptGenerator.get_system_prompt(
