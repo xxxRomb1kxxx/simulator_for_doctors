@@ -24,26 +24,14 @@ class LLMResponseGenerator:
         )
 
     def generate_response(self, context: str, history: str, user_input: str) -> str:
-        """Сгенерировать ответ через LLM"""
-        full_prompt = f"""Контекст болезни:
-        {context}
-
-        История диалога:
-        {history}
-
-        Врач спрашивает: {user_input}
-
-        Как мне, как пациенту, ответить на этот вопрос? 
-        Инструкции для ответа:
-        1. Отвечай от первого лица, будь естественным
-        2. Опиши свои ощущения и переживания
-        3. Отвечай кратко (1-3 предложения), но ёмко
-        4. Не ставь диагноз сам, только описывай симптомы
-        5. Будь эмоционально вовлечённым, но не драматизируй"""
-
+        formatted_prompt = SystemPromptGenerator.get_patient_response_prompt(
+            context=context,
+            history=history,
+            user_input=user_input
+        )
         messages = [
             SystemMessage(content=self.system_prompt),
-            HumanMessage(content=full_prompt),
+            HumanMessage(content=formatted_prompt),
         ]
 
         try:

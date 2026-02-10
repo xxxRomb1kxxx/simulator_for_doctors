@@ -3,9 +3,7 @@ from models.entities.disease import Disease
 from models.entities.disease import DiseaseType
 import random
 
-
-def create_patient(disease_type: DiseaseType) -> Patient:
-    disease_data = {
+disease_data = {
         DiseaseType.APPENDICITIS: {
             "name": "Аппендицит",
             "complaints": ["Острая боль в правой нижней части живота", "Тошнота", "Потеря аппетита"],
@@ -48,6 +46,9 @@ def create_patient(disease_type: DiseaseType) -> Patient:
             "correct_diagnosis": "Идиопатическая генерализованная эпилепсия"
         }
     }
+
+def create_patient(disease_type: DiseaseType) -> Patient:
+
 
     if disease_type not in disease_data:
         raise ValueError("Unknown disease type")

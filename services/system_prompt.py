@@ -1,5 +1,4 @@
 class SystemPromptGenerator:
-    """Генератор системных промптов с учётом конкретной болезни"""
 
     @staticmethod
     def get_base_prompt() -> str:
@@ -104,13 +103,46 @@ class SystemPromptGenerator:
         base = SystemPromptGenerator.get_base_prompt()
         specific = SystemPromptGenerator.get_disease_specific_prompt(disease_name, complaints)
 
-        return f"""{base}
+        return f"""
+    {base}
 
-Конкретная информация о твоём состоянии:
-{specific}
+    Конкретная информация о твоём состоянии:
+    {specific}
 
-Твои конкретные жалобы: {', '.join(complaints)}
+    Твои конкретные жалобы: {', '.join(complaints)}
+    
+    Помни: ты реальный человек, который пришёл к врачу за помощью. 
+    Ты хочешь получить точный диагноз и лечение, поэтому стараешься чётко описать свои симптомы.
+    """
 
-Помни: ты реальный человек, который пришёл к врачу за помощью. 
-Ты хочешь получить точный диагноз и лечение, поэтому стараешься чётко описать свои симптомы.
-"""
+    @staticmethod
+    def get_patient_response_prompt(context: str = None, history: str = None, user_input: str = None) -> str:
+        template = """
+    Контекст болезни:
+    {context}
+
+    История диалога:
+    {history}
+
+    Врач спрашивает: {user_input}
+
+    Как мне, как пациенту, ответить на этот вопрос? 
+    Инструкции для ответа:
+    1. Отвечай от первого лица, будь естественным
+    2. Опиши свои ощущения и переживания
+    3. Отвечай кратко (1-3 предложения), но ёмко
+    4. Не ставь диагноз сам, только описывай симптомы
+    5. Будь эмоционально вовлечённым, но не драматизируй"""
+
+        if context and history and user_input:
+            return template.format(
+                context=context,
+                history=history,
+                user_input=user_input
+            )
+        return template
+
+    @classmethod
+    def format_patient_response(cls, context: str, history: str, user_input: str) -> str:
+        """Форматирует промпт ответа пациента с данными"""
+        return cls.get_patient_response_prompt(context, history, user_input)

@@ -1,6 +1,5 @@
 import asyncio
 from aiogram import Bot, Dispatcher
-
 from config.settings import settings
 from controllers.handlers import menu, training, dialog
 

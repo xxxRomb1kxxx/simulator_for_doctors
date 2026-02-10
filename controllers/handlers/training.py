@@ -9,6 +9,8 @@ from models.entities.medical_card import MedicalCard
 from dialog_engine.dialog_engine import DialogEngine
 from models.entities.disease import DiseaseType
 
+import random
+
 router = Router()
 
 
@@ -19,8 +21,30 @@ async def training(cb: CallbackQuery):
         "🩺 Выберите заболевание для отработки:",
         reply_markup=training_menu()
     )
+@router.callback_query(F.data == "control_case")
+async def control_case(cb: CallbackQuery, state: FSMContext):
 
+    await cb.answer()
 
+    random_disease = random.choice(list(DiseaseType))
+    patient = create_patient(random_disease)
+    card = MedicalCard()
+    engine = DialogEngine(patient, card)
+
+    await state.update_data(
+        patient=patient,
+        card=card,
+        engine=engine,
+    )
+
+    await cb.message.answer(
+        "🎯 Контрольный кейс начат!\n"
+        "Вам достался пациент со случайным заболеванием. "
+        "Попробуйте поставить правильный диагноз.\n\n"
+        "Пациент заходит в кабинет..."
+    )
+    await cb.message.answer("Добрый день, доктор. Можно войти на приём?")
+    await state.set_state(DialogState.waiting_question)
 @router.callback_query(F.data.startswith("disease:"))
 async def start_case(cb: CallbackQuery, state: FSMContext):
     await cb.answer()

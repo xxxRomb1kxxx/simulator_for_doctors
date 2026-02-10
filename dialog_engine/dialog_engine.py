@@ -5,6 +5,8 @@ from dialog_engine.llm_response_generator import LLMResponseGenerator
 from dialog_engine.patient_card_manager import PatientCardManager
 from models.entities.patient import Patient
 from models.intents.intents import detect_intent
+
+
 class DialogEngine:
     """Главный класс для управления диалогом (рефакторинг)"""
 
@@ -23,11 +25,9 @@ class DialogEngine:
         text_lower = text.lower()
         self.dialog_state.add_to_history(text)
 
-        # Обработка стадии приветствия
         if self.dialog_state.stage == "greeting":
             return self._handle_greeting_stage(text_lower)
 
-        # Определение и обработка интента
         intent = detect_intent(text_lower)
 
         if intent in ["complaints", "anamnesis", "diagnostics", "diagnosis"]:
