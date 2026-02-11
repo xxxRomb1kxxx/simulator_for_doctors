@@ -48,11 +48,8 @@ disease_data = {
     }
 
 def create_patient(disease_type: DiseaseType) -> Patient:
-
-
     if disease_type not in disease_data:
         raise ValueError("Unknown disease type")
-
     data = disease_data[disease_type]
 
     disease = Disease(
@@ -60,7 +57,7 @@ def create_patient(disease_type: DiseaseType) -> Patient:
         complaints=data["complaints"],
         anamnesis=data["anamnesis"],
         diagnostics=data["diagnostics"],
-        correct_diagnosis=data["correct_diagnosis"]
+        correct_diagnosis=data["correct_diagnosis"],
     )
 
     ages = {
@@ -68,7 +65,7 @@ def create_patient(disease_type: DiseaseType) -> Patient:
         DiseaseType.DIABETES: random.randint(45, 65),
         DiseaseType.ANEMIA: random.randint(25, 60),
         DiseaseType.TUBERCULOSIS: random.randint(25, 50),
-        DiseaseType.EPILEPSY: random.randint(20, 35)
+        DiseaseType.EPILEPSY: random.randint(20, 35),
     }
 
     professions = ["Рабочий", "Офисный сотрудник", "Учитель", "Водитель", "Продавец"]
@@ -78,5 +75,5 @@ def create_patient(disease_type: DiseaseType) -> Patient:
         gender="М",
         age=ages.get(disease_type, 30),
         profession=random.choice(professions),
-        disease=disease
+        disease=disease,
     )

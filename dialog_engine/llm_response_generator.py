@@ -1,8 +1,10 @@
+import logging
 from langchain_gigachat import GigaChat
 from langchain_core.messages import HumanMessage, SystemMessage
 from services.system_prompt import SystemPromptGenerator
 from config.settings import settings
 
+logger = logging.getLogger(__name__)
 
 class LLMResponseGenerator:
 
@@ -35,7 +37,8 @@ class LLMResponseGenerator:
 
         try:
             llm_response = self.llm.invoke(messages)
+            logger.info("LLM call success, tokens=%s", len(llm_response.content or ""))
             return llm_response.content.strip()
         except Exception as e:
-            print(f"Ошибка LLM: {e}")
+            logger.exception("Ошибка LLM при генерации ответа")
             return "Извините, я не совсем понял вопрос. Можете переформулировать?"

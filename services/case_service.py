@@ -1,14 +1,14 @@
+import logging
 import random
-from typing import Tuple
 
 from services.patient_factory import create_patient
 from models.entities.medical_card import MedicalCard
 from dialog_engine.dialog_engine import DialogEngine
 from models.entities.disease import DiseaseType
 from services.diagnosis_checker import check
-
 from dataclasses import dataclass
 
+logger = logging.getLogger(__name__)
 
 @dataclass
 class DialogResult:
@@ -34,10 +34,12 @@ class CaseService:
     @staticmethod
     def start_random_case() -> CaseInitResult:
         disease = random.choice(list(DiseaseType))
+        logger.info("Starting random case with disease: %s", disease)
         return CaseService._build_case(disease)
 
     @staticmethod
     def start_case_by_type(disease_type: DiseaseType) -> CaseInitResult:
+        logger.info("Starting case by type: %s", disease_type)
         return CaseService._build_case(disease_type)
 
     @staticmethod
@@ -45,6 +47,7 @@ class CaseService:
         patient = create_patient(disease_type)
         card = MedicalCard()
         engine = DialogEngine(patient, card)
+        logger.info("Case built for patient=%s, disease=%s", patient.fio, patient.disease.name)
 
         return CaseInitResult(
             patient=patient,
@@ -55,11 +58,13 @@ class CaseService:
     @staticmethod
     def process_dialog(engine: DialogEngine, user_text: str) -> DialogResult:
         answer = engine.process(user_text)
+        logger.info("Processing dialog, user_text=%s", user_text)
 
         should_ask = (
             "что это может быть" in answer.lower()
             or "диагноз" in answer.lower()
         )
+        logger.info("Dialog answer=%s, should_ask_diagnosis=%s", answer, should_ask)
 
         return DialogResult(
             answer_text=answer,

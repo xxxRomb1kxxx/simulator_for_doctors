@@ -1,11 +1,14 @@
-class MedicalCard:
-    def __init__(self):
-        self.complaints = []
-        self.anamnesis = []
-        self.diagnostics = []
-        self.diagnosis = None
+from dataclasses import dataclass, field
+from typing import List, Optional
 
-    def render(self):
+@dataclass
+class MedicalCard:
+    complaints: List[str] = field(default_factory=list)
+    anamnesis: List[str] = field(default_factory=list)
+    diagnostics: List[str] = field(default_factory=list)
+    diagnosis: Optional[str] = None
+
+    def render(self) -> str:
         return (
             "📋 Медицинская карта\n\n"
             f"Жалобы:\n- " + "\n- ".join(self.complaints) + "\n\n"

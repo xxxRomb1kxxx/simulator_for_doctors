@@ -1,3 +1,4 @@
+import logging
 from dialog_engine.dialog_state import DialogState
 from dialog_engine.experience_enricher import ExperienceEnricher
 from dialog_engine.intent_handler import IntentHandler
@@ -6,6 +7,8 @@ from dialog_engine.patient_card_manager import PatientCardManager
 from models.entities.patient import Patient
 from models.intents.intents import detect_intent
 
+
+logger = logging.getLogger(__name__)
 
 class DialogEngine:
     """Главный класс для управления диалогом (рефакторинг)"""
@@ -19,6 +22,7 @@ class DialogEngine:
             patient.disease.name,
             patient.disease.complaints
         )
+        logger.info("DialogEngine initialized for patient %s", patient.fio)
 
     def process(self, text: str) -> str:
         """Обработать пользовательский ввод"""
@@ -27,6 +31,7 @@ class DialogEngine:
 
         if self.dialog_state.stage == "greeting":
             return self._handle_greeting_stage(text_lower)
+
 
         intent = detect_intent(text_lower)
 

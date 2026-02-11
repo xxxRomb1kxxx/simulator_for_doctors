@@ -1,7 +1,13 @@
+from dataclasses import dataclass
+from typing import Literal
+from .disease import Disease
+
+Gender = Literal["М", "Ж"]
+
+@dataclass
 class Patient:
-    def __init__(self, fio, gender, age, profession, disease):
-        self.fio = fio
-        self.gender = gender
-        self.age = age
-        self.profession = profession
-        self.disease = disease
+    fio: str
+    gender: Gender
+    age: int
+    profession: str
+    disease: Disease

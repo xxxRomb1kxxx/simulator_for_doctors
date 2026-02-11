@@ -1,5 +1,4 @@
 from models.entities.patient import Patient
-from typing import Optional
 
 
 class PatientCardManager:
