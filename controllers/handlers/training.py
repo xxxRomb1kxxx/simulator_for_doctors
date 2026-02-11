@@ -4,12 +4,9 @@ from aiogram.fsm.context import FSMContext
 
 from controllers.keyboards.inline import training_menu
 from controllers.states.dialog import DialogState
-from services.patient_factory import create_patient
-from models.entities.medical_card import MedicalCard
-from dialog_engine.dialog_engine import DialogEngine
 from models.entities.disease import DiseaseType
+from services.case_service import CaseService
 
-import random
 
 router = Router()
 
@@ -26,15 +23,12 @@ async def control_case(cb: CallbackQuery, state: FSMContext):
 
     await cb.answer()
 
-    random_disease = random.choice(list(DiseaseType))
-    patient = create_patient(random_disease)
-    card = MedicalCard()
-    engine = DialogEngine(patient, card)
+    case = CaseService.start_random_case()
 
     await state.update_data(
-        patient=patient,
-        card=card,
-        engine=engine,
+        patient=case.patient,
+        card=case.card,
+        engine=case.engine,
     )
 
     await cb.message.answer(
@@ -45,6 +39,7 @@ async def control_case(cb: CallbackQuery, state: FSMContext):
     )
     await cb.message.answer("Добрый день, доктор. Можно войти на приём?")
     await state.set_state(DialogState.waiting_question)
+
 @router.callback_query(F.data.startswith("disease:"))
 async def start_case(cb: CallbackQuery, state: FSMContext):
     await cb.answer()
@@ -52,18 +47,15 @@ async def start_case(cb: CallbackQuery, state: FSMContext):
 
     try:
         disease_type = DiseaseType(disease_code)
+        case = CaseService.start_case_by_type(disease_type)
     except ValueError:
         await cb.message.answer("Ошибка: неизвестный тип заболевания")
         return
 
-    patient = create_patient(disease_type)
-    card = MedicalCard()
-    engine = DialogEngine(patient, card)
-
     await state.update_data(
-        patient=patient,
-        card=card,
-        engine=engine
+        patient=case.patient,
+        card=case.card,
+        engine=case.engine
     )
 
     await cb.message.answer("Диалог начат! Вы - врач, пациент заходит к вам в кабинет.")
