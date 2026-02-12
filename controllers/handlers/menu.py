@@ -1,13 +1,76 @@
 import logging
-from aiogram import Router
-from aiogram.types import Message
-from aiogram.filters import Command
-from controllers.keyboards.inline import main_menu
+from aiogram import Router, F
+from aiogram.types import Message, CallbackQuery
+from aiogram.filters import Command, CommandStart
+from controllers.keyboards.inline import main_menu,get_main_kb,training_menu
 
 router = Router()
 logger = logging.getLogger(__name__)
 
+
+@router.message(CommandStart())
+async def cmd_start(msg: Message):
+    welcome_text = """
+👨‍⚕️ **СИМУЛЯТОР ДЛЯ ВРАЧЕЙ BFU**
+
+🎯 **Функционал бота:**
+
+• **🏥 Тренировка** — интерактивные кейсы с пациентами
+• **🤖 Реалистичный диалог** — GigaChat имитирует пациента  
+• **🩺 Проверка диагноза** — автоматическая оценка правильности
+• **📊 Карточки болезней** — подробная информация и критерии
+
+**📋 Управление:**
+• `/завершить` — выйти из диалога в любой момент
+• `/диагноз` — сразу перейти к постановке диагноза  
+• `/start` — главное меню
+
+**Выберите режим тренировки:**
+    """
+
+    await msg.answer(
+        welcome_text,
+        reply_markup=get_main_kb(),
+        parse_mode="Markdown"
+    )
+
+
+@router.message(F.text == "ℹ️ Помощь")
+@router.message(Command("help"))
+async def cmd_help(msg: Message):
+    help_text = """
+**📖 Как пользоваться симулятором:**
+
+1️⃣ **Начните** — `/start` → "🏥 Тренировка"
+2️⃣ **Выберите** болезнь из списка  
+3️⃣ **Опрашивайте** пациента (обычный текст)
+4️⃣ **Завершите** — `/завершить` или `/диагноз`
+5️⃣ **Проверьте** диагноз — напишите название болезни
+
+**💡 Команды работают В ЛЮБОЙ МОМЕНТ диалога:**
+• `/завершить` — сброс → главное меню
+• `/диагноз` — сразу к проверке
+• `/start` — главное меню
+
+**✅ Готово к тренировке!**
+    """
+
+    await msg.answer(help_text, parse_mode="Markdown")
+
+
 @router.message(Command("start"))
-async def start(msg: Message):
-    logger.info("Received /start from user_id=%s", msg.from_user.id if msg.from_user else None)
-    await msg.answer("Симулятор врача", reply_markup=main_menu())
+@router.callback_query(F.data == "start")
+async def start(msg_or_cb):
+
+    await msg_or_cb.answer(
+        "👨‍⚕️ **СИМУЛЯТОР ДЛЯ ВРАЧЕЙ BFU**",
+        reply_markup=main_menu()
+    )
+@router.message(F.text == "🏥 Тренажер")
+async def trainer_button(msg: Message):
+    logger.info("Trainer button pressed by user_id=%s", msg.from_user.id)
+    await msg.answer(
+        "🩺 **Выберите заболевание для отработки:**",
+        reply_markup=training_menu()
+    )
+

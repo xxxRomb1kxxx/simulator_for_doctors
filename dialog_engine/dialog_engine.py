@@ -26,17 +26,15 @@ class DialogEngine:
 
     def _handle_greeting_stage(self, text: str) -> str:
         self.dialog_state.transition_stage("dialog")
-        greeting_context = """
-        Ситуация: Ты только что зашел в кабинет врача. 
-        Это начало приема. Врач тебя пригласил.
-        Будь вежливым, немного волнительным, представься.
-        """
-        doctor_question = "приглашаю" if any(w in text for w in ["проходи", "сад", "да"]) else "можно войти?"
+        # greeting_context = """
+        # Ситуация: Ты только что зашел в кабинет врача.
+        # Это начало приема. Врач тебя пригласил.
+        # Будь вежливым, немного волнительным, представься.
+        # """
+        # doctor_question = "приглашаю" if any(w in text for w in ["проходи", "сад", "да"]) else "можно войти?"
 
         return self._generate_llm_response(
-            text=text,
-            greeting_mode=True,
-            context_override=greeting_context
+            text=text
         )
 
     def _generate_llm_response(self, text: str) -> str:

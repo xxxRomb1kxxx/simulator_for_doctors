@@ -64,11 +64,7 @@ class CaseService:
         return DialogResult(answer_text=answer, should_ask_diagnosis=False)
 
     @staticmethod
-    def check_diagnosis(
-        user_text: str,
-        patient,
-        card: MedicalCard
-    ) -> DiagnosisResult:
+    def check_diagnosis(user_text: str, patient, card: MedicalCard) -> DiagnosisResult:
 
         user_diagnosis = user_text.strip()
         card.diagnosis = user_diagnosis

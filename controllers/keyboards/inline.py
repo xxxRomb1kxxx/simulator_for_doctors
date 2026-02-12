@@ -1,4 +1,6 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import ReplyKeyboardMarkup,BotCommand
+from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
 def main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -19,3 +21,21 @@ def dialog_control_keyboard():
         [InlineKeyboardButton(text="🏥 Поставить диагноз", callback_data="cmd:diagnosis")],
         [InlineKeyboardButton(text="✅ Завершить", callback_data="cmd:finish")]
     ])
+def get_main_kb() -> ReplyKeyboardMarkup:
+    builder = ReplyKeyboardBuilder()
+    builder.button(text="🏥 Тренажер")
+    builder.button(text="ℹ️ Помощь")
+    builder.adjust(1)
+    return builder.as_markup(
+        resize_keyboard=True,
+        one_time_keyboard=False
+    )
+
+async def set_bot_commands(bot):
+    commands = [
+        BotCommand(command="start", description="🏥 Главное меню"),
+        BotCommand(command="help", description="📖 Помощь и инструкции"),
+        BotCommand(command="завершить", description="⏹️ Завершить диалог"),
+        BotCommand(command="диагноз", description="🩺 Поставить диагноз")
+    ]
+    await bot.set_my_commands(commands)
