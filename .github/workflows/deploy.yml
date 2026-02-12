@@ -1,0 +1,45 @@
+name: Deploy
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Server
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build package
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+          python -m build
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          script: |
+            cd /opt/simulator_for_doctors
+            git pull
+            source venv/bin/activate
+            pip install -r requirements.txt
+            sudo systemctl restart bot-service
+
+      - name: Notify Telegram
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            ✅ Deployed: ${{ github.repository }}
+            🏷️ Version: ${{ github.ref_name }}
+            🚀 Author: ${{ github.actor }}

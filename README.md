@@ -34,3 +34,11 @@
 | `main.py` | Точка входа, запуск бота |
 
 ---
+[![Tests](https://github.com/xxxRomb1kxxx/simulator_for_doctors/actions/workflows/test.yml/badge.svg)](https://github.com/xxxRomb1kxxx/simulator_for_doctors/actions/workflows/test.yml)
+[![Coverage](https://codecov.io/gh/xxxRomb1kxxx/simulator_for_doctors/branch/main/graph/badge.svg)](https://codecov.io/gh/xxxRomb1kxxx/simulator_for_doctors)
+[![Lint](https://github.com/xxxRomb1kxxx/simulator_for_doctors/actions/workflows/lint.yml/badge.svg)](https://github.com/xxxRomb1kxxx/simulator_for_doctors/actions/workflows/lint.yml)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+**Coverage:** ![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/xxxRomb1kxxx/coverage.json)
+
