@@ -3,6 +3,7 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
 
+from controllers.handlers.dialog import finish_dialog, force_diagnosis
 from controllers.keyboards.inline import training_menu
 from controllers.states.dialog import DialogState
 from models.entities.disease import DiseaseType
@@ -20,6 +21,14 @@ async def training(cb: CallbackQuery):
         "🩺 Выберите заболевание для отработки:",
         reply_markup=training_menu()
     )
+@router.callback_query(F.data.startswith("cmd:"))
+async def dialog_commands(cb: CallbackQuery, state: FSMContext):
+    if cb.data == "cmd:diagnosis":
+        await force_diagnosis()
+    elif cb.data == "cmd:finish":
+        await finish_dialog()
+    await cb.answer()
+
 @router.callback_query(F.data == "control_case")
 async def control_case(cb: CallbackQuery, state: FSMContext):
     logger.info("Control case requested: user_id=%s", cb.from_user.id if cb.from_user else None)

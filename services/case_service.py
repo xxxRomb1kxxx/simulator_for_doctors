@@ -58,20 +58,10 @@ class CaseService:
     @staticmethod
     def process_dialog(engine: DialogEngine, user_text: str) -> DialogResult:
         answer = engine.process(user_text)
-        logger.info("Processing dialog, user_text=%s", user_text)
+        if user_text.strip() in ["/диагноз", "/diagnosis", "диагноз"]:
+            return DialogResult(answer_text=answer, should_ask_diagnosis=True)
 
-        should_ask = (
-            "что это может быть" in answer.lower()
-            or "диагноз" in answer.lower()
-        )
-        logger.info("Dialog answer=%s, should_ask_diagnosis=%s", answer, should_ask)
-
-        return DialogResult(
-            answer_text=answer,
-            should_ask_diagnosis=should_ask,
-            prompt_text="Теперь поставьте диагноз (напишите его текстом):"
-            if should_ask else None
-        )
+        return DialogResult(answer_text=answer, should_ask_diagnosis=False)
 
     @staticmethod
     def check_diagnosis(

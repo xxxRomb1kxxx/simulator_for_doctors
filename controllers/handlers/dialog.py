@@ -1,6 +1,7 @@
 import logging
 from aiogram import Router
 from aiogram.types import Message
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
 from controllers.states.dialog import DialogState
@@ -70,3 +71,24 @@ async def diagnosis(msg: Message, state: FSMContext):
     await state.clear()
     logger.info("State cleared for user_id=%s", msg.from_user.id if msg.from_user else None)
     await msg.answer("Диалог завершён. Для нового кейса нажмите /start")
+
+
+@router.message(Command("завершить"))
+async def finish_dialog(msg: Message, state: FSMContext):
+    logger.info("Finish command received: user_id=%s", msg.from_user.id if msg.from_user else None)
+    await msg.answer("✅ Диалог завершен командой /завершить")
+    await state.clear()
+    await msg.answer("Для нового кейса нажмите /start")
+
+
+@router.message(Command("диагноз"))
+async def force_diagnosis(msg: Message, state: FSMContext):
+    logger.info("Diagnosis command received: user_id=%s", msg.from_user.id if msg.from_user else None)
+
+    data = await state.get_data()
+    if not data:
+        await msg.answer("Сначала начните кейс!")
+        return
+
+    await state.set_state(DialogState.waiting_diagnosis)
+    await msg.answer("📝 Теперь поставьте диагноз (напишите его текстом):")

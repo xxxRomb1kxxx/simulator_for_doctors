@@ -18,10 +18,10 @@ class LLMResponseGenerator:
             scope=settings.SCOPE,
             model="GigaChat",
             verify_ssl_certs=False,
-            temperature=0.7,
+            temperature=0.9,
             timeout=30,
-            top_p=0.9,
-            max_tokens=1000
+            top_p=0.95,
+            max_tokens=1500
         )
 
     def generate_response(self, context: str, history: str, user_input: str) -> str:
@@ -39,6 +39,7 @@ class LLMResponseGenerator:
             llm_response = self.llm.invoke(messages)
             logger.info("LLM call success, tokens=%s", len(llm_response.content or ""))
             return llm_response.content.strip()
-        except Exception as e:
+
+        except Exception:
             logger.exception("Ошибка LLM при генерации ответа")
             return "Извините, я не совсем понял вопрос. Можете переформулировать?"
