@@ -132,5 +132,4 @@ simulator_for_doctors/
 ```
 <div align="center"> <b>Сделано с ❤️ для обучения врачей</b><br> <sub>xxxRomb1kxxx/simulator_for_doctors</sub> </div> 
 
-**Coverage:** ![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/xxxRomb1kxxx/coverage.json)
 
