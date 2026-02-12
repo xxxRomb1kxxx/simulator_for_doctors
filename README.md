@@ -142,6 +142,7 @@ simulator_for_doctors/
 
 ```
 <div align="center"> <b>Сделано с ❤️ для обучения врачей</b><br> <sub>xxxRomb1kxxx/simulator_for_doctors</sub> </div> 
+
 [![Tests](https://github.com/xxxRomb1kxxx/simulator_for_doctors/actions/workflows/test.yml/badge.svg)](https://github.com/xxxRomb1kxxx/simulator_for_doctors/actions/workflows/test.yml)
 [![Coverage](https://codecov.io/gh/xxxRomb1kxxx/simulator_for_doctors/branch/main/graph/badge.svg)](https://codecov.io/gh/xxxRomb1kxxx/simulator_for_doctors)
 [![Lint](https://github.com/xxxRomb1kxxx/simulator_for_doctors/actions/workflows/lint.yml/badge.svg)](https://github.com/xxxRomb1kxxx/simulator_for_doctors/actions/workflows/lint.yml)
