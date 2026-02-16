@@ -20,25 +20,35 @@ class DialogEngine:
         logger.info("DialogEngine initialized for patient %s", patient.fio)
 
     def process(self, text: str) -> str:
+        """Обрабатывает сообщение от врача и возвращает ответ пациента"""
+        self.dialog_state.add_to_history("user", text)
         if self.dialog_state.stage == "greeting":
-            return self._handle_greeting_stage(text.lower())
-        return self._generate_llm_response(text)
+            response = self._handle_greeting_stage(text)
+        else:
+            response = self._generate_llm_response(text)
+        self.dialog_state.add_to_history("assistant", response)
+
+        return response
 
     def _handle_greeting_stage(self, text: str) -> str:
+        greeting_context = "Ты только что зашел в кабинет врача. Это начало приема."
+        response = self._generate_llm_response(text, additional_context=greeting_context)
         self.dialog_state.transition_stage("dialog")
-        # greeting_context = """
-        # Ситуация: Ты только что зашел в кабинет врача.
-        # Это начало приема. Врач тебя пригласил.
-        # Будь вежливым, немного волнительным, представься.
-        # """
-        # doctor_question = "приглашаю" if any(w in text for w in ["проходи", "сад", "да"]) else "можно войти?"
 
-        return self._generate_llm_response(
-            text=text
+        return response
+
+    def _generate_llm_response(self, text: str, additional_context: str = "") -> str:
+        disease_context = self.patient_card_manager.get_disease_context()
+        if additional_context:
+            disease_context += f"\n\nДополнительный контекст: {additional_context}"
+        recent_history = self.dialog_state.get_recent_history(20)
+        response = self.llm_generator.generate_response(
+            context=disease_context,
+            dialog_messages=recent_history
         )
 
-    def _generate_llm_response(self, text: str) -> str:
-        context = self.patient_card_manager.get_disease_context()
-        history = self.dialog_state.get_recent_history(10)
-        response = self.llm_generator.generate_response(context, history, text)
         return response
+
+    def reset_dialog(self):
+        self.dialog_state = DialogState()
+        logger.info("Dialog reset completed")

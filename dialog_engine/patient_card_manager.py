@@ -1,4 +1,5 @@
 from models.entities.patient import Patient
+import re
 
 
 class PatientCardManager:
@@ -17,7 +18,7 @@ class PatientCardManager:
         self.card.diagnostics = diagnostics
 
     def get_disease_context(self) -> str:
-        return f"""
+        base_context = f"""
         Информация о моей болезни:
         - Диагноз: {self.patient.disease.name}
         - Основные симптомы: {', '.join(self.patient.disease.complaints)}
@@ -29,3 +30,8 @@ class PatientCardManager:
         - Профессия: {self.patient.profession}
         - Пол: {self.patient.gender}
         """
+
+        if hasattr(self.card, 'complaints') and self.card.complaints:
+            base_context += f"\nУже сообщённые жалобы: {', '.join(self.card.complaints)}"
+
+        return base_context
