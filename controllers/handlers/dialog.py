@@ -1,94 +1,74 @@
 import logging
+
 from aiogram import Router
-from aiogram.types import Message
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from aiogram.types import Message
 
+from controllers.keyboards.inline import dialog_control_keyboard
 from controllers.states.dialog import DialogState
 from services.case_service import CaseService
 
-router = Router()
+router = Router(name="dialog")
 logger = logging.getLogger(__name__)
 
 
-@router.message(Command("завершить"))
-async def finish_dialog(msg: Message, state: FSMContext):
-    logger.info("Finish command received: user_id=%s", msg.from_user.id if msg.from_user else None)
-    await msg.answer("✅ Диалог завершен командой /завершить")
+@router.message(Command("finish"))
+async def finish_dialog(msg: Message, state: FSMContext) -> None:
+    logger.info("Finish command: user_id=%s", msg.from_user.id if msg.from_user else None)
     await state.clear()
+    await msg.answer("✅ Диалог завершён командой /завершить")
     await msg.answer("Для нового кейса нажмите /start")
 
 
-@router.message(Command("диагноз"))
-async def force_diagnosis(msg: Message, state: FSMContext):
-    logger.info("Diagnosis command received: user_id=%s", msg.from_user.id if msg.from_user else None)
-
+@router.message(Command("diagnosis"))
+async def force_diagnosis(msg: Message, state: FSMContext) -> None:
+    logger.info("Diagnosis command: user_id=%s", msg.from_user.id if msg.from_user else None)
     data = await state.get_data()
-    if not data:
-        await msg.answer("Сначала начните кейс!")
+    if not data or "patient" not in data:
+        await msg.answer("Сначала начните кейс! Нажмите /start")
         return
-
     await state.set_state(DialogState.waiting_diagnosis)
-    await msg.answer("📝 Теперь поставьте диагноз (напишите его текстом):")
+    await msg.answer("📝 Поставьте диагноз — напишите его текстом:")
+
 
 @router.message(DialogState.waiting_question)
-async def dialog(msg: Message, state: FSMContext):
-    logger.info(
-        "Dialog message received: user_id=%s, text=%s, state=%s",
-        msg.from_user.id if msg.from_user else None,
-        msg.text,
-        "waiting_question",
-    )
+async def handle_dialog(msg: Message, state: FSMContext) -> None:
+    user_id = msg.from_user.id if msg.from_user else None
+    logger.info("Dialog message: user_id=%s, text=%r", user_id, msg.text)
 
     data = await state.get_data()
+    engine = data.get("engine")
+    if engine is None:
+        await msg.answer("Произошла ошибка состояния. Начните новый кейс через /start")
+        await state.clear()
+        return
 
-    result = CaseService.process_dialog(
-        engine=data["engine"],
-        user_text=msg.text
-    )
-    logger.info(
-        "Dialog processed: answer_text=%s, should_ask_diagnosis=%s",
-        result.answer_text,
-        result.should_ask_diagnosis,
-    )
-
-    await msg.answer(result.answer_text)
-
-    if result.should_ask_diagnosis:
-        await state.set_state(DialogState.waiting_diagnosis)
-        logger.info(
-            "State changed to waiting_diagnosis for user_id=%s",
-            msg.from_user.id if msg.from_user else None,
-        )
-        await msg.answer(result.prompt_text)
+    result = CaseService.process_dialog(engine=engine, user_text=msg.text or "")
+    await msg.answer(result.answer_text, reply_markup=dialog_control_keyboard())
 
 
 @router.message(DialogState.waiting_diagnosis)
-async def diagnosis(msg: Message, state: FSMContext):
-    logger.info(
-        "Diagnosis message received: user_id=%s, text=%s, state=%s",
-        msg.from_user.id if msg.from_user else None,
-        msg.text,
-        "waiting_diagnosis",
-    )
+async def handle_diagnosis(msg: Message, state: FSMContext) -> None:
+    user_id = msg.from_user.id if msg.from_user else None
+    logger.info("Diagnosis message: user_id=%s, text=%r", user_id, msg.text)
 
     data = await state.get_data()
-    logger.debug("FSM data (waiting_diagnosis): %s", data)
+    patient = data.get("patient")
+    card = data.get("card")
+
+    if patient is None or card is None:
+        await msg.answer("Произошла ошибка состояния. Начните новый кейс через /start")
+        await state.clear()
+        return
 
     result = CaseService.check_diagnosis(
-        user_text=msg.text,
-        patient=data["patient"],
-        card=data["card"]
-    )
-    logger.info(
-        "Diagnosis checked: is_correct=%s, message_text=%s",
-        result.is_correct,
-        result.message_text,
+        user_text=msg.text or "",
+        patient=patient,
+        card=card,
     )
 
     await msg.answer(result.message_text)
     await msg.answer(result.rendered_card)
-
     await state.clear()
-    logger.info("State cleared for user_id=%s", msg.from_user.id if msg.from_user else None)
     await msg.answer("Диалог завершён. Для нового кейса нажмите /start")

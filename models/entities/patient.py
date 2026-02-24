@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 from typing import Literal
+
 from .disease import Disease
 
 Gender = Literal["М", "Ж"]
+
 
 @dataclass
 class Patient:

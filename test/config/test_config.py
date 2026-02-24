@@ -1,55 +1,49 @@
-import pytest
 import os
 from unittest.mock import patch
-from config.settings import Settings
+
+import pytest
+
 from config.logging import setup_logging
 
 
-class TestConfig:
+class TestSettings:
 
-    @patch.dict(os.environ, {
-        'GIGA_CREDENTIALS': 'test_creds',
-        'ADMIN_IDS': '123456,789012'
-    }, clear=True)
-    def test_config_from_env(self):
+    def test_setup_logging_string_level(self) -> None:
+        """Оригинальный баг: setup_logging(level: int) но тест передавал строку."""
+        setup_logging("DEBUG")  # не должно падать
+        setup_logging("INFO")
+        setup_logging("WARNING")
 
-        Settings._Settings__instance = None
+    def test_settings_validation(self) -> None:
+        """Pydantic выдаёт ошибку при отсутствии обязательных полей."""
+        from config.settings import Settings
 
-        config = Settings()
-        assert config.GIGA_CREDENTIALS == 'test_creds'
-        if hasattr(config, 'ADMIN_IDS'):
-            assert 123456 in config.ADMIN_IDS
-            assert 789012 in config.ADMIN_IDS
+        with pytest.raises(Exception):
+            # Без BOT_TOKEN и GIGA_CREDENTIALS должна быть ValidationError
+            with patch.dict(os.environ, {}, clear=True):
+                Settings()
 
-    @patch.dict(os.environ, {
-        'GIGA_CREDENTIALS': 'test_creds',
-    }, clear=True)
-    def test_config_without_optional(self):
-        Settings._Settings__instance = None
+    def test_settings_from_env(self) -> None:
+        from config.settings import Settings
 
-        config = Settings()
-        assert config.GIGA_CREDENTIALS == 'test_creds'
+        env = {
+            "BOT_TOKEN": "test_token",
+            "GIGA_CREDENTIALS": "test_creds",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            s = Settings()
+            assert s.bot_token == "test_token"
+            assert s.giga_credentials == "test_creds"
+            assert s.log_level == "INFO"  # default
 
-    @patch.dict(os.environ, {}, clear=True)
-    def test_config_missing_required(self):
+    def test_invalid_log_level_raises(self) -> None:
+        from config.settings import Settings
 
-        Settings._Settings__instance = None
-
-        config = Settings()
-        assert config is not None
-        assert hasattr(config, 'GIGA_CREDENTIALS')
-
-    def test_singleton_pattern(self):
-        Settings._Settings__instance = None
-
-        config1 = Settings()
-        config2 = Settings()
-        assert config1 is config2
-
-    @patch('logging.config.dictConfig')
-    def test_setup_logging(self, mock_dictConfig):
-        try:
-            setup_logging(level='DEBUG')
-            assert True
-        except Exception as e:
-            pytest.fail(f"setup_logging вызвал ошибку: {e}")
+        env = {
+            "BOT_TOKEN": "tok",
+            "GIGA_CREDENTIALS": "creds",
+            "LOG_LEVEL": "NONSENSE",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            with pytest.raises(Exception):
+                Settings()

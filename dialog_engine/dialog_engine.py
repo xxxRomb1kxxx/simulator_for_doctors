@@ -1,54 +1,51 @@
 import logging
+
 from dialog_engine.dialog_state import DialogState
 from dialog_engine.llm_response_generator import LLMResponseGenerator
 from dialog_engine.patient_card_manager import PatientCardManager
+from models.entities.medical_card import MedicalCard
 from models.entities.patient import Patient
-
-
 
 logger = logging.getLogger(__name__)
 
+
 class DialogEngine:
 
-    def __init__(self, patient: Patient, card):
+    def __init__(self, patient: Patient, card: MedicalCard) -> None:
         self.dialog_state = DialogState()
         self.patient_card_manager = PatientCardManager(patient, card)
         self.llm_generator = LLMResponseGenerator(
-            patient.disease.name,
-            patient.disease.complaints
+            disease_name=patient.disease.name,
+            complaints=patient.disease.complaints,
         )
         logger.info("DialogEngine initialized for patient %s", patient.fio)
 
     def process(self, text: str) -> str:
-        """Обрабатывает сообщение от врача и возвращает ответ пациента"""
         self.dialog_state.add_to_history("user", text)
+
         if self.dialog_state.stage == "greeting":
-            response = self._handle_greeting_stage(text)
+            response = self._handle_greeting(text)
         else:
-            response = self._generate_llm_response(text)
+            response = self._generate_response(text)
+
         self.dialog_state.add_to_history("assistant", response)
-
         return response
 
-    def _handle_greeting_stage(self, text: str) -> str:
-        greeting_context = "Ты только что зашел в кабинет врача. Это начало приема."
-        response = self._generate_llm_response(text, additional_context=greeting_context)
+    def _handle_greeting(self, text: str) -> str:
+        additional = "Ты только что зашёл в кабинет врача. Это начало приёма."
+        context = self.patient_card_manager.get_disease_context() + f"\n\nДополнительно: {additional}"
+        response = self._call_llm(context)
         self.dialog_state.transition_stage("dialog")
-
         return response
 
-    def _generate_llm_response(self, text: str, additional_context: str = "") -> str:
-        disease_context = self.patient_card_manager.get_disease_context()
-        if additional_context:
-            disease_context += f"\n\nДополнительный контекст: {additional_context}"
-        recent_history = self.dialog_state.get_recent_history(20)
-        response = self.llm_generator.generate_response(
-            context=disease_context,
-            dialog_messages=recent_history
-        )
+    def _generate_response(self, text: str) -> str:
+        context = self.patient_card_manager.get_disease_context()
+        return self._call_llm(context)
 
-        return response
+    def _call_llm(self, context: str) -> str:
+        recent = self.dialog_state.get_recent_history(20)
+        return self.llm_generator.generate_response(context=context, dialog_messages=recent)
 
-    def reset_dialog(self):
+    def reset_dialog(self) -> None:
         self.dialog_state = DialogState()
-        logger.info("Dialog reset completed")
+        logger.info("Dialog reset")
