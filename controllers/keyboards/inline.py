@@ -8,21 +8,23 @@ from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
 
 def main_menu() -> InlineKeyboardMarkup:
+    """Выбор режима: Тренировка или Контрольный кейс."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🏥 Тренировка", callback_data="training")],
+            [InlineKeyboardButton(text="📚 Тренировка", callback_data="training")],
             [InlineKeyboardButton(text="🎯 Контрольный кейс", callback_data="control_case")],
         ]
     )
 
 
 def training_menu() -> InlineKeyboardMarkup:
+    """Выбор конкретной болезни для тренировки."""
     diseases = [
-        ("Сахарный диабет", "diabetes"),
-        ("Анемия", "anemia"),
-        ("Туберкулёз", "tuberculosis"),
-        ("Аппендицит", "appendicitis"),
-        ("Эпилепсия", "epilepsy"),
+        ("🩸 Сахарный диабет", "diabetes"),
+        ("💉 Анемия", "anemia"),
+        ("🫁 Туберкулёз", "tuberculosis"),
+        ("🔪 Аппендицит", "appendicitis"),
+        ("⚡ Эпилепсия", "epilepsy"),
     ]
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -36,7 +38,7 @@ def dialog_control_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🩺 Поставить диагноз", callback_data="cmd:diagnosis")],
-            [InlineKeyboardButton(text="✅ Завершить", callback_data="cmd:finish")],
+            [InlineKeyboardButton(text="❌ Завершить диалог", callback_data="cmd:finish")],
         ]
     )
 
@@ -57,7 +59,3 @@ async def set_bot_commands(bot) -> None:
         BotCommand(command="diagnosis", description="🩺 Поставить диагноз"),
     ]
     await bot.set_my_commands(commands)
-
-
-# Алиасы для обратной совместимости тестов
-get_main_kb = get_main_kb

@@ -48,7 +48,7 @@ async def cb_start(cb: CallbackQuery) -> None:
 @router.message(F.text == "🏥 Тренажер")
 async def trainer_button(msg: Message) -> None:
     logger.info("Trainer button: user_id=%s", msg.from_user.id if msg.from_user else None)
-    await msg.answer("🩺 <b>Выберите заболевание для отработки:</b>", reply_markup=training_menu())
+    await msg.answer("🩺 <b>Выберите заболевание для отработки:</b>", reply_markup=main_menu())
 
 
 @router.message(F.text == "ℹ️ Помощь")
