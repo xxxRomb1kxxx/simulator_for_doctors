@@ -1,13 +1,3 @@
-"""
-Точка входа приложения.
-
-Исправления над оригиналом:
-- set_bot_commands теперь вызывается при startup (в оригинале функция была, но нигде не вызывалась).
-- Graceful shutdown — дожидаемся завершения текущих хендлеров.
-- Redis FSM storage с fallback на Memory.
-- Middleware регистрируется глобально.
-- parse_mode=HTML (оригинал использовал Markdown в одних местах и HTML в других — непоследовательно).
-"""
 import asyncio
 import logging
 import sys
@@ -27,23 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 def build_dispatcher() -> Dispatcher:
-    # Пробуем Redis, при недоступности — MemoryStorage
-    try:
-        from aiogram.fsm.storage.redis import RedisStorage
-
-        settings = get_settings()
-        storage = RedisStorage.from_url(settings.redis_url)
-        logger.info("FSM storage: Redis (%s)", settings.redis_url)
-    except Exception as e:
-        logger.warning("Redis unavailable (%s), using MemoryStorage", e)
-        storage = MemoryStorage()
+    storage = MemoryStorage()
 
     dp = Dispatcher(storage=storage)
-
-    # Глобальный middleware
     dp.update.middleware(LoggingMiddleware())
-
-    # Роутеры (порядок важен: dialog последним, чтобы Command-фильтры имели приоритет)
     dp.include_router(menu.router)
     dp.include_router(training.router)
     dp.include_router(dialog.router)
