@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock
 from aiogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup, BotCommand
-from controllers.keyboards.inline import (
+from telegram.keyboards.inline import (
     main_menu,
     training_menu,
     dialog_control_keyboard,

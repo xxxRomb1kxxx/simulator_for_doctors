@@ -5,8 +5,8 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
-from controllers.keyboards.inline import dialog_control_keyboard
-from controllers.states.dialog import DialogState
+from telegram.keyboards.inline import dialog_control_keyboard
+from telegram.states.dialog import DialogState
 from services.case_service import CaseService
 
 router = Router(name="dialog")

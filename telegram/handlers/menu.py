@@ -5,7 +5,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from controllers.keyboards.inline import get_main_kb, main_menu, training_menu
+from telegram.keyboards.inline import get_main_kb, main_menu, training_menu
 
 router = Router(name="menu")
 logger = logging.getLogger(__name__)

@@ -9,8 +9,8 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from config.logging import setup_logging
 from config.settings import get_settings
-from controllers.handlers import dialog, menu, training
-from controllers.keyboards.inline import set_bot_commands
+from telegram.handlers import dialog, menu, training
+from telegram.keyboards.inline import set_bot_commands
 from middlewares.logging import LoggingMiddleware
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ def build_dispatcher() -> Dispatcher:
 
 async def on_startup(bot: Bot) -> None:
     me = await bot.get_me()
-    await set_bot_commands(bot)  # <-- Исправлен баг оригинала: команды никогда не регистрировались
+    await set_bot_commands(bot)
     logger.info("Bot started: @%s (id=%d)", me.username, me.id)
 
 
@@ -41,10 +41,10 @@ async def on_shutdown(bot: Bot) -> None:
 
 async def main() -> None:
     settings = get_settings()
-    setup_logging(settings.log_level)
+    setup_logging(settings.logging.log_level)
 
     bot = Bot(
-        token=settings.bot_token,
+        token=settings.telegram.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
 

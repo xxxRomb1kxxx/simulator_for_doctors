@@ -1,7 +1,7 @@
 import logging
 
 from dialog_engine.dialog_state import DialogState
-from dialog_engine.llm_response_generator import LLMResponseGenerator
+from giga.llm_response_generator import GigachatResponseGenerator
 from dialog_engine.patient_card_manager import PatientCardManager
 from models.entities.medical_card import MedicalCard
 from models.entities.patient import Patient
@@ -14,7 +14,7 @@ class DialogEngine:
     def __init__(self, patient: Patient, card: MedicalCard) -> None:
         self.dialog_state = DialogState()
         self.patient_card_manager = PatientCardManager(patient, card)
-        self.llm_generator = LLMResponseGenerator(
+        self.llm_generator = GigachatResponseGenerator(
             disease_name=patient.disease.name,
             complaints=patient.disease.complaints,
         )

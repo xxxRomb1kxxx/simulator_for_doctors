@@ -4,9 +4,9 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
-from controllers.handlers.dialog import finish_dialog, force_diagnosis
-from controllers.keyboards.inline import training_menu
-from controllers.states.dialog import DialogState
+from telegram.handlers.dialog import finish_dialog, force_diagnosis
+from telegram.keyboards.inline import training_menu
+from telegram.states.dialog import DialogState
 from models.entities.disease import DiseaseType
 from services.case_service import CaseService
 

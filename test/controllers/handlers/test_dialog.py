@@ -4,8 +4,8 @@ import pytest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, User
 
-from controllers.handlers.dialog import finish_dialog, force_diagnosis, handle_diagnosis, handle_dialog
-from controllers.states.dialog import DialogState
+from telegram.handlers.dialog import finish_dialog, force_diagnosis, handle_diagnosis, handle_dialog
+from telegram.states.dialog import DialogState
 from services.case_service import DiagnosisResult, DialogResult
 
 
@@ -45,7 +45,7 @@ class TestDialogHandlers:
         await force_diagnosis(mock_message, mock_state)
         mock_state.set_state.assert_called_once_with(DialogState.waiting_diagnosis)
 
-    @patch("controllers.handlers.dialog.CaseService")
+    @patch("telegram.handlers.dialog.CaseService")
     async def test_handle_dialog(self, mock_svc, mock_message, mock_state) -> None:
         mock_state.get_data.return_value = {"engine": Mock()}
         mock_svc.process_dialog.return_value = DialogResult(answer_text="Болит живот")
@@ -55,14 +55,14 @@ class TestDialogHandlers:
         mock_svc.process_dialog.assert_called_once()
         mock_message.answer.assert_called_once()
 
-    @patch("controllers.handlers.dialog.CaseService")
+    @patch("telegram.handlers.dialog.CaseService")
     async def test_handle_dialog_no_engine(self, mock_svc, mock_message, mock_state) -> None:
         mock_state.get_data.return_value = {}
         await handle_dialog(mock_message, mock_state)
         mock_state.clear.assert_called_once()
         mock_svc.process_dialog.assert_not_called()
 
-    @patch("controllers.handlers.dialog.CaseService")
+    @patch("telegram.handlers.dialog.CaseService")
     async def test_handle_diagnosis_correct(self, mock_svc, mock_message, mock_state) -> None:
         mock_state.get_data.return_value = {"patient": Mock(), "card": Mock()}
         mock_svc.check_diagnosis.return_value = DiagnosisResult(

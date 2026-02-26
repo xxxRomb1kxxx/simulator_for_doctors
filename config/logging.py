@@ -1,19 +1,31 @@
+from pydantic import Field, field_validator
+from .base import BaseAppSettings
+
 import logging
 import sys
 
+LOG_FORMAT = "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"
 
-def setup_logging(level: str = "INFO") -> None:
-    """
-    Настраивает логирование.
-    :param level: строка — 'DEBUG', 'INFO', 'WARNING', etc.
-    """
-    numeric_level = getattr(logging, level.upper(), logging.INFO)
+def setup_logging(level: int = logging.INFO) -> None:
     logging.basicConfig(
-        level=numeric_level,
-        format="[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        handlers=[logging.StreamHandler(sys.stdout)],
+        level=level,
+        format=LOG_FORMAT,
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+        ],
     )
-    # Заглушаем слишком шумные библиотеки
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+class LoggingSettings(BaseAppSettings):
+    log_level: str = Field(default="INFO")
+    debug: bool = Field(default=False)
+
+    @field_validator("log_level")
+    @classmethod
+    def validate_log_level(cls, v: str) -> str:
+        allowed = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+        upper = v.upper()
+
+        if upper not in allowed:
+            raise ValueError(f"log_level must be one of {allowed}")
+
+        return upper
