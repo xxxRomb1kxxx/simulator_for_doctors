@@ -5,7 +5,7 @@ from typing import List
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_gigachat import GigaChat
-from config.settings import get_settings
+from config import get_settings
 from giga.system_prompt import SystemPromptGenerator
 
 logger = logging.getLogger(__name__)

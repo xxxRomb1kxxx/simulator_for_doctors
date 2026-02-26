@@ -2,7 +2,7 @@ import pytest
 
 from models.entities.disease import DiseaseType
 from models.entities.patient import Patient
-from services.patient_factory import DISEASE_DATA, create_patient
+from models.patient_factory import DISEASE_DATA, create_patient
 
 _ALL_FIOS = {
     "Иванов Иван Иванович", "Петров Сергей Александрович",

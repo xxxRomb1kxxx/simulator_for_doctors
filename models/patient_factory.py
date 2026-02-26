@@ -1,8 +1,8 @@
 import random
 from typing import TypedDict
 
-from models.entities.disease import Disease, DiseaseType
-from models.entities.patient import Patient
+from models.models import Disease, DiseaseType
+from models.models import Patient
 
 class DiseaseData(TypedDict):
     name: str

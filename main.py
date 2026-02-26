@@ -7,8 +7,8 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from config.logging import setup_logging
-from config.settings import get_settings
+from config import setup_logging
+from config import get_settings
 from telegram.handlers import dialog, menu, training
 from telegram.keyboards.inline import set_bot_commands
 from middlewares.logging import LoggingMiddleware
@@ -41,7 +41,7 @@ async def on_shutdown(bot: Bot) -> None:
 
 async def main() -> None:
     settings = get_settings()
-    setup_logging(settings.logging.log_level)
+    setup_logging(settings.log_level)
 
     bot = Bot(
         token=settings.telegram.bot_token,
