@@ -1,42 +1,40 @@
 import pytest
+
 from models.entities.medical_card import MedicalCard
 
 
 class TestMedicalCard:
 
-    def test_medical_card_creation(self):
+    def test_default_state(self) -> None:
         card = MedicalCard()
-        assert hasattr(card, 'complaints')
-        assert hasattr(card, 'anamnesis')
-        assert hasattr(card, 'diagnosis')
+        assert card.complaints == []
+        assert card.anamnesis == []
+        assert card.diagnostics == []
         assert card.diagnosis is None
-        assert isinstance(card.complaints, list)
-        assert isinstance(card.anamnesis, list)
 
-    def test_add_complaint(self):
+    def test_render_empty_card(self) -> None:
+        """ИСПРАВЛЕН баг оригинала: render() крашился на пустых списках."""
         card = MedicalCard()
-        card.complaints.append("Болит голова")
-        assert "Болит голова" in card.complaints
-        assert len(card.complaints) == 1
-
-    def test_add_anamnesis(self):
-        card = MedicalCard()
-        card.anamnesis.append("Болеет 3 дня")
-        assert "Болеет 3 дня" in card.anamnesis
-        assert len(card.anamnesis) == 1
-
-    def test_set_diagnosis(self):
-        card = MedicalCard()
-        card.diagnosis = "Острый аппендицит"
-        assert card.diagnosis == "Острый аппендицит"
-
-    def test_render(self):
-        card = MedicalCard()
-        card.complaints.append("Боль в животе")
-        card.anamnesis.append("Началось 6 часов назад")
-        card.diagnosis = "Аппендицит"
-
         rendered = card.render()
         assert isinstance(rendered, str)
+        assert "не собрано" in rendered
+        assert "не поставлен" in rendered
+
+    def test_render_filled_card(self) -> None:
+        card = MedicalCard(
+            complaints=["Боль в животе"],
+            anamnesis=["Болит 6 часов"],
+            diagnostics=["УЗИ"],
+            diagnosis="Острый аппендицит",
+        )
+        rendered = card.render()
         assert "Боль в животе" in rendered
-        assert "Аппендицит" in rendered
+        assert "Болит 6 часов" in rendered
+        assert "УЗИ" in rendered
+        assert "Острый аппендицит" in rendered
+
+    def test_render_partial_card(self) -> None:
+        card = MedicalCard(complaints=["Кашель"])
+        rendered = card.render()
+        assert "Кашель" in rendered
+        assert "не собрано" in rendered  # anamnesis и diagnostics пустые

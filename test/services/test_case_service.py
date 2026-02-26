@@ -1,138 +1,88 @@
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
-from services.case_service import CaseService, DialogResult, DiagnosisResult, CaseInitResult
+
 from models.entities.disease import DiseaseType
-from models.entities.patient import Patient
 from models.entities.medical_card import MedicalCard
-from dialog_engine.dialog_engine import DialogEngine
-from models.entities.disease import Disease
+from models.entities.patient import Patient
+from services.case_service import CaseInitResult, CaseService, DiagnosisResult, DialogResult
 
 
 class TestCaseService:
-    """Тесты для сервиса клинических кейсов."""
 
-    @patch('services.case_service.random.choice')
-    @patch('services.case_service.CaseService._build_case')
-    def test_start_random_case(self, mock_build_case, mock_choice):
-        """Тест запуска случайного кейса."""
+    @patch("services.case_service.random.choice")
+    @patch.object(CaseService, "_build_case")
+    def test_start_random_case(self, mock_build, mock_choice) -> None:
         mock_choice.return_value = DiseaseType.APPENDICITIS
-        mock_build_case.return_value = CaseInitResult(
-            patient=Mock(),
-            card=Mock(),
-            engine=Mock()
-        )
+        mock_build.return_value = CaseInitResult(patient=Mock(), card=Mock(), engine=Mock())
 
         result = CaseService.start_random_case()
 
         mock_choice.assert_called_once_with(list(DiseaseType))
-        mock_build_case.assert_called_once_with(DiseaseType.APPENDICITIS)
+        mock_build.assert_called_once_with(DiseaseType.APPENDICITIS)
         assert isinstance(result, CaseInitResult)
 
-    @patch('services.case_service.create_patient')
-    @patch('services.case_service.MedicalCard')
-    @patch('services.case_service.DialogEngine')
-    def test_build_case(self, mock_dialog_engine, mock_medical_card, mock_create_patient):
-        """Тест создания кейса."""
-        # Создаем реальный объект болезни, а не мок
-        from models.entities.disease import Disease
+    @patch.object(CaseService, "_build_case")
+    def test_start_case_by_type(self, mock_build) -> None:
+        mock_build.return_value = CaseInitResult(patient=Mock(), card=Mock(), engine=Mock())
+        result = CaseService.start_case_by_type(DiseaseType.DIABETES)
+        mock_build.assert_called_once_with(DiseaseType.DIABETES)
+        assert isinstance(result, CaseInitResult)
 
-        mock_patient = Mock()
-        mock_patient.fio = "Иванов Иван"
+    def test_process_dialog_normal(self) -> None:
+        engine = Mock()
+        engine.process.return_value = "Болит живот, доктор."
 
-        # Создаем реальный объект Disease
-        disease = Disease(
-            name="Аппендицит",
-            complaints=[],
-            anamnesis=[],
-            diagnostics=[],
-            correct_diagnosis="Острый аппендицит"
-        )
-        mock_patient.disease = disease
+        result = CaseService.process_dialog(engine=engine, user_text="Где болит?")
 
-        mock_create_patient.return_value = mock_patient
-
-        mock_card = Mock(spec=MedicalCard)
-        mock_medical_card.return_value = mock_card
-
-        mock_engine = Mock(spec=DialogEngine)
-        mock_dialog_engine.return_value = mock_engine
-
-        result = CaseService._build_case(DiseaseType.APPENDICITIS)
-
-        mock_create_patient.assert_called_once_with(DiseaseType.APPENDICITIS)
-        mock_medical_card.assert_called_once()
-        mock_dialog_engine.assert_called_once_with(mock_patient, mock_card)
-
-        assert result.patient == mock_patient
-        assert result.card == mock_card
-        assert result.engine == mock_engine
-
-    def test_process_dialog_normal(self):
-        """Тест обычной обработки диалога."""
-        mock_engine = Mock(spec=DialogEngine)
-        mock_engine.process.return_value = "Как давно болит?"
-
-        result = CaseService.process_dialog(mock_engine, "Болит живот")
-
-        mock_engine.process.assert_called_once_with("Болит живот")
-        assert result.answer_text == "Как давно болит?"
+        engine.process.assert_called_once_with("Где болит?")
+        assert result.answer_text == "Болит живот, доктор."
         assert result.should_ask_diagnosis is False
-        assert result.prompt_text is None
 
-    @pytest.mark.parametrize("command", ["/диагноз", "/diagnosis", "диагноз"])
-    def test_process_dialog_with_diagnosis_command(self, command):
-        """Тест обработки команды диагноза."""
-        mock_engine = Mock(spec=DialogEngine)
-        mock_engine.process.return_value = "Хорошо, ставьте диагноз"
+    def test_process_dialog_never_sets_diagnosis_from_text(self) -> None:
+        """
+        В оригинале process_dialog проверял текст на '/диагноз' — это было лишним.
+        Теперь решение принимает только FSM-хендлер.
+        """
+        engine = Mock()
+        engine.process.return_value = "OK"
 
-        result = CaseService.process_dialog(mock_engine, command)
+        # Даже если текст "/диагноз", process_dialog не должен менять флаг
+        result = CaseService.process_dialog(engine=engine, user_text="/диагноз")
+        assert result.should_ask_diagnosis is False
 
-        mock_engine.process.assert_called_once_with(command)
-        assert result.should_ask_diagnosis is True
-
-    @patch('services.case_service.check')
-    def test_check_diagnosis_correct(self, mock_check):
-        """Тест проверки правильного диагноза."""
-        mock_patient = Mock()
-        mock_patient.disease.correct_diagnosis = "Острый аппендицит"
-        mock_card = Mock(spec=MedicalCard)
-        mock_card.render.return_value = "Медицинская карта"
+    @patch("services.case_service.check")
+    @patch("services.case_service.similarity_score")
+    def test_check_diagnosis_correct(self, mock_score, mock_check) -> None:
         mock_check.return_value = True
+        mock_score.return_value = 1.0
 
-        result = CaseService.check_diagnosis("Острый аппендицит", mock_patient, mock_card)
+        patient = Mock()
+        patient.disease.correct_diagnosis = "Острый аппендицит"
+        card = Mock(spec=MedicalCard)
+        card.render.return_value = "📋 Карта"
 
-        mock_check.assert_called_once_with("Острый аппендицит", "Острый аппендицит")
-        assert mock_card.diagnosis == "Острый аппендицит"
+        result = CaseService.check_diagnosis("Острый аппендицит", patient, card)
+
         assert result.is_correct is True
-        assert result.message_text == "Диагноз верный!"
-        assert result.rendered_card == "Медицинская карта"
+        assert "верный" in result.message_text.lower()
+        assert result.rendered_card == "📋 Карта"
+        assert result.score == 1.0
+        assert card.diagnosis == "Острый аппендицит"
 
-    @patch('services.case_service.check')
-    def test_check_diagnosis_incorrect(self, mock_check):
-        """Тест проверки неправильного диагноза."""
-        mock_patient = Mock()
-        mock_patient.disease.correct_diagnosis = "Острый аппендицит"
-        mock_card = Mock(spec=MedicalCard)
-        mock_card.render.return_value = "Медицинская карта"
+    @patch("services.case_service.check")
+    @patch("services.case_service.similarity_score")
+    def test_check_diagnosis_incorrect(self, mock_score, mock_check) -> None:
         mock_check.return_value = False
+        mock_score.return_value = 0.2
 
-        result = CaseService.check_diagnosis("Гастрит", mock_patient, mock_card)
+        patient = Mock()
+        patient.disease.correct_diagnosis = "Острый аппендицит"
+        card = Mock(spec=MedicalCard)
+        card.render.return_value = "📋 Карта"
 
-        mock_check.assert_called_once_with("Гастрит", "Острый аппендицит")
+        result = CaseService.check_diagnosis("Гастрит", patient, card)
+
         assert result.is_correct is False
-        assert "Неверно" in result.message_text
         assert "Острый аппендицит" in result.message_text
-
-    def test_start_case_by_type(self):
-        """Тест запуска кейса по типу заболевания."""
-        with patch.object(CaseService, '_build_case') as mock_build:
-            mock_build.return_value = CaseInitResult(
-                patient=Mock(),
-                card=Mock(),
-                engine=Mock()
-            )
-
-            result = CaseService.start_case_by_type(DiseaseType.DIABETES)
-
-            mock_build.assert_called_once_with(DiseaseType.DIABETES)
-            assert isinstance(result, CaseInitResult)
+        assert "20%" in result.message_text

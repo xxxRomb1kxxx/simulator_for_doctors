@@ -119,7 +119,7 @@ text
 simulator_for_doctors/
 ├── .github/workflows/    # CI/CD
 ├── config/              # Pydantic
-├── controllers/         # Telegram handlers
+├── telegram/         # Telegram handlers
 │   ├── handlers/
 │   ├── keyboards/
 │   └── states/

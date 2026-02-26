@@ -1,17 +1,23 @@
-from dotenv import load_dotenv
-import os
-#pattern singleton
+from functools import lru_cache
+
+from .telegram import TelegramSettings
+from .gigachat import GigaChatSettings
+from .logging import LoggingSettings, setup_logging
+
+import logging
+
 class Settings:
-    __instance = None
-    def __new__(cls):
-        if cls.__instance is None:
-            cls.__instance = super().__new__(cls)
-            load_dotenv()
-            cls.__instance.BOT_TOKEN = os.getenv("BOT_TOKEN")
-            cls.__instance.GIGA_CREDENTIALS = os.getenv("GIGA_CREDENTIALS")
-            cls.__instance.SCOPE = os.getenv("SCOPE")
-        return cls.__instance
-
-settings = Settings()
+    def __init__(self) -> None:
+        self.telegram = TelegramSettings()
+        self.gigachat = GigaChatSettings()
+        self.logging = LoggingSettings()
 
 
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return Settings()
+
+
+settings = get_settings()
+
+setup_logging(level=logging.getLevelName(settings.logging.log_level))

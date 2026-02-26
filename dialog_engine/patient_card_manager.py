@@ -1,37 +1,27 @@
+from models.entities.medical_card import MedicalCard
 from models.entities.patient import Patient
-import re
 
 
 class PatientCardManager:
 
-    def __init__(self, patient: Patient, card):
+    def __init__(self, patient: Patient, card: MedicalCard) -> None:
         self.patient = patient
         self.card = card
 
-    def update_complaints(self, complaints: list):
-        self.card.complaints = complaints
-
-    def update_anamnesis(self, anamnesis: list):
-        self.card.anamnesis = anamnesis
-
-    def update_diagnostics(self, diagnostics: list):
-        self.card.diagnostics = diagnostics
-
     def get_disease_context(self) -> str:
-        base_context = f"""
-        Информация о моей болезни:
-        - Диагноз: {self.patient.disease.name}
-        - Основные симптомы: {', '.join(self.patient.disease.complaints)}
-        - История развития: {', '.join(self.patient.disease.anamnesis)}
-        - Проведённые обследования: {', '.join(self.patient.disease.diagnostics)}
-
-        Мой профиль:
-        - Возраст: {self.patient.age}
-        - Профессия: {self.patient.profession}
-        - Пол: {self.patient.gender}
-        """
-
-        if hasattr(self.card, 'complaints') and self.card.complaints:
-            base_context += f"\nУже сообщённые жалобы: {', '.join(self.card.complaints)}"
-
-        return base_context
+        p = self.patient
+        d = p.disease
+        ctx = (
+            f"Информация о моей болезни:\n"
+            f"  - Диагноз (скрыт от врача): {d.name}\n"
+            f"  - Основные симптомы: {', '.join(d.complaints)}\n"
+            f"  - История развития: {', '.join(d.anamnesis)}\n"
+            f"  - Проведённые обследования: {', '.join(d.diagnostics)}\n\n"
+            f"Мой профиль:\n"
+            f"  - Возраст: {p.age}\n"
+            f"  - Профессия: {p.profession}\n"
+            f"  - Пол: {p.gender}\n"
+        )
+        if self.card.complaints:
+            ctx += f"\nУже сообщённые жалобы: {', '.join(self.card.complaints)}"
+        return ctx
