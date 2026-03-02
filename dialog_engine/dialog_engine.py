@@ -45,7 +45,6 @@ class DialogEngine:
         )
         self._history.append({"role": "assistant", "content": response})
         self._update_card(doctor_question=text, patient_reply=response)
-
         return response
 
     def reset(self) -> None:
