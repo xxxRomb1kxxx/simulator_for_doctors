@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from telegram.keyboards.inline import dialog_control_keyboard
-from telegram.states.dialog import DialogState
+from dialog_engine.dialog_state import DialogState
 from services.case_service import process_dialog,check_diagnosis
 router = Router(name="dialog")
 logger = logging.getLogger(__name__)

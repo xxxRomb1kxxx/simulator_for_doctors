@@ -7,7 +7,7 @@ from aiogram.types import CallbackQuery
 from telegram.handlers.dialog import finish_dialog, force_diagnosis
 from telegram.keyboards.inline import training_menu
 from models.patient_factory import DiseaseType
-from telegram.states.dialog import DialogState
+from dialog_engine.dialog_state import DialogState
 from services.case_service import start_case_by_type, start_random_case
 
 router = Router(name="training")

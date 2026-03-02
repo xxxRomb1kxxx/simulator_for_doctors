@@ -37,14 +37,16 @@ class DialogEngine:
             dialog_messages=self._history[-20:],
         )
         self._history.append({"role": "assistant", "content": response})
+
+        # ✅ FIX: заполняем карту после каждого ответа пациента
+        self._update_card(doctor_question=text, patient_reply=response)
+
         return response
 
     def reset(self) -> None:
         self._stage = "greeting"
         self._history.clear()
         logger.info("Dialog reset for patient %s", self.patient.fio)
-
-    # ------------------------------------------------------------------ #
 
     def _build_context(self, extra: str = "") -> str:
         p, d = self.patient, self.patient.disease
@@ -64,3 +66,33 @@ class DialogEngine:
         if extra:
             ctx += f"\n\nДополнительно: {extra}"
         return ctx
+
+    def _update_card(self, doctor_question: str, patient_reply: str) -> None:
+        try:
+            data = self._llm.extract_medical_data(
+                doctor_question=doctor_question,
+                patient_reply=patient_reply,
+            )
+            self._merge_into_card(data)
+        except Exception:
+            logger.exception("Card update failed, skipping")
+
+    def _merge_into_card(self, data: dict) -> None:
+        existing_complaints  = {x.lower() for x in self.card.complaints}
+        existing_anamnesis   = {x.lower() for x in self.card.anamnesis}
+        existing_diagnostics = {x.lower() for x in self.card.diagnostics}
+
+        for item in data.get("complaints", []):
+            if item and item.lower() not in existing_complaints:
+                self.card.complaints.append(item)
+                existing_complaints.add(item.lower())
+
+        for item in data.get("anamnesis", []):
+            if item and item.lower() not in existing_anamnesis:
+                self.card.anamnesis.append(item)
+                existing_anamnesis.add(item.lower())
+
+        for item in data.get("diagnostics", []):
+            if item and item.lower() not in existing_diagnostics:
+                self.card.diagnostics.append(item)
+                existing_diagnostics.add(item.lower())
