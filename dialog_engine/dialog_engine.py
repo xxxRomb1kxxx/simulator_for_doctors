@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from giga.llm_response_generator import GigachatResponseGenerator, GigachatCardParser, IResponseGenerator, ICardParser
+from giga.llm_response_generator import GigachatResponseGenerator, IResponseGenerator
 from models.models import MedicalCard, Patient
 
 logger = logging.getLogger(__name__)
@@ -14,8 +14,7 @@ class DialogEngine:
         self,
         patient: Patient,
         card: MedicalCard,
-        llm: IResponseGenerator |None = None,
-        card_parser: ICardParser |None = None,
+        llm: IResponseGenerator | None = None,
     ) -> None:
         self.patient = patient
         self.card = card
@@ -25,7 +24,6 @@ class DialogEngine:
             disease_name=patient.disease.name,
             complaints=patient.disease.complaints,
         )
-        self._card_parser: ICardParser = card_parser or GigachatCardParser()
         logger.info("DialogEngine initialized for patient %s", patient.fio)
 
     def process(self, text: str) -> str:
@@ -39,13 +37,14 @@ class DialogEngine:
         else:
             context = self._build_context()
 
-        response = self._llm.generate_response(
+        result = self._llm.generate(
             context=context,
             dialog_messages=self._history[-20:],
         )
-        self._history.append({"role": "assistant", "content": response})
-        self._update_card(doctor_question=text, patient_reply=response)
-        return response
+
+        self._history.append({"role": "assistant", "content": result.text})
+        self._merge_into_card(result)
+        return result.text
 
     def reset(self) -> None:
         self._stage = "greeting"
@@ -71,32 +70,22 @@ class DialogEngine:
             ctx += f"\n\nДополнительно: {extra}"
         return ctx
 
-    def _update_card(self, doctor_question: str, patient_reply: str) -> None:
-        try:
-            data = self._card_parser.extract_medical_data(
-                doctor_question=doctor_question,
-                patient_reply=patient_reply,
-            )
-            self._merge_into_card(data)
-        except Exception:
-            logger.exception("Card update failed, skipping")
-
-    def _merge_into_card(self, data: dict) -> None:
+    def _merge_into_card(self, result) -> None:
         existing_complaints  = {x.lower() for x in self.card.complaints}
         existing_anamnesis   = {x.lower() for x in self.card.anamnesis}
         existing_diagnostics = {x.lower() for x in self.card.diagnostics}
 
-        for item in data.get("complaints", []):
+        for item in result.complaints:
             if item and item.lower() not in existing_complaints:
                 self.card.complaints.append(item)
                 existing_complaints.add(item.lower())
 
-        for item in data.get("anamnesis", []):
+        for item in result.anamnesis:
             if item and item.lower() not in existing_anamnesis:
                 self.card.anamnesis.append(item)
                 existing_anamnesis.add(item.lower())
 
-        for item in data.get("diagnostics", []):
+        for item in result.diagnostics:
             if item and item.lower() not in existing_diagnostics:
                 self.card.diagnostics.append(item)
                 existing_diagnostics.add(item.lower())
