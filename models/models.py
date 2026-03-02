@@ -1,15 +1,45 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
+from enum import Enum
+from typing import Literal, Optional
+
+
+class DiseaseType(str, Enum):
+    DIABETES = "diabetes"
+    ANEMIA = "anemia"
+    TUBERCULOSIS = "tuberculosis"
+    APPENDICITIS = "appendicitis"
+    EPILEPSY = "epilepsy"
+
+
+Gender = Literal["М", "Ж"]
+
+
+@dataclass
+class Disease:
+    name: str
+    complaints: list[str]
+    anamnesis: list[str]
+    diagnostics: list[str]
+    correct_diagnosis: str
+
+
+@dataclass
+class Patient:
+    fio: str
+    gender: Gender
+    age: int
+    profession: str
+    disease: Disease
 
 
 @dataclass
 class MedicalCard:
-    complaints: List[str] = field(default_factory=list)
-    anamnesis: List[str] = field(default_factory=list)
-    diagnostics: List[str] = field(default_factory=list)
+    complaints: list[str] = field(default_factory=list)
+    anamnesis: list[str] = field(default_factory=list)
+    diagnostics: list[str] = field(default_factory=list)
     diagnosis: Optional[str] = None
 
-    def _render_section(self, title: str, items: List[str]) -> str:
+    def _render_section(self, title: str, items: list[str]) -> str:
         if not items:
             return f"{title}\n  — не собрано\n"
         return title + "\n" + "\n".join(f"  • {item}" for item in items) + "\n"

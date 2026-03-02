@@ -3,7 +3,7 @@ import pytest
 from models.entities.disease import Disease, DiseaseType
 from models.entities.medical_card import MedicalCard
 from models.entities.patient import Patient
-from services.patient_factory import create_patient
+from models.patient_factory import create_patient
 
 
 @pytest.fixture

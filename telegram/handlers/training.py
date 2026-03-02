@@ -6,9 +6,9 @@ from aiogram.types import CallbackQuery
 
 from telegram.handlers.dialog import finish_dialog, force_diagnosis
 from telegram.keyboards.inline import training_menu
-from telegram.states.dialog import DialogState
-from models.entities.disease import DiseaseType
-from services.case_service import CaseService
+from models.patient_factory import DiseaseType
+from dialog_engine.dialog_state import DialogState
+from services.case_service import start_case_by_type, start_random_case
 
 router = Router(name="training")
 logger = logging.getLogger(__name__)
@@ -26,12 +26,7 @@ async def training(cb: CallbackQuery) -> None:
 
 @router.callback_query(F.data.in_({"cmd:diagnosis", "cmd:finish"}))
 async def dialog_commands(cb: CallbackQuery, state: FSMContext) -> None:
-    """
-    Обрабатывает кнопки управления диалогом.
-    ИСПРАВЛЕН БАГ оригинала: вызов force_diagnosis() / finish_dialog() без аргументов.
-    """
     await cb.answer()
-    # Создаём Message-like объект через cb.message для передачи в хендлеры
     if cb.data == "cmd:diagnosis":
         await force_diagnosis(cb.message, state)
     elif cb.data == "cmd:finish":
@@ -43,7 +38,7 @@ async def control_case(cb: CallbackQuery, state: FSMContext) -> None:
     logger.info("Control case: user_id=%s", cb.from_user.id if cb.from_user else None)
     await cb.answer()
 
-    case = CaseService.start_random_case()
+    case = start_random_case()
     await state.update_data(patient=case.patient, card=case.card, engine=case.engine)
     await state.set_state(DialogState.waiting_question)
 
@@ -70,7 +65,7 @@ async def start_case(cb: CallbackQuery, state: FSMContext) -> None:
         await cb.message.answer("❌ Ошибка: неизвестный тип заболевания")
         return
 
-    case = CaseService.start_case_by_type(disease_type)
+    case = start_case_by_type(disease_type)
     await state.update_data(patient=case.patient, card=case.card, engine=case.engine)
     await state.set_state(DialogState.waiting_question)
 

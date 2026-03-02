@@ -1,3 +1,4 @@
+import json
 import logging
 from abc import ABC, abstractmethod
 from typing import List
@@ -5,7 +6,7 @@ from typing import List
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_gigachat import GigaChat
-from config.settings import get_settings
+from config import get_settings
 from giga.system_prompt import SystemPromptGenerator
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,10 @@ class AbstractResponseGenerator(ABC):
 
     @abstractmethod
     def generate_response(self, context: str, dialog_messages: list[dict],) -> str:
+        pass
+
+    @abstractmethod
+    def extract_medical_data(self, doctor_question: str, patient_reply: str) -> dict:
         pass
 
 class GigachatResponseGenerator(AbstractResponseGenerator):
@@ -95,3 +100,34 @@ class GigachatResponseGenerator(AbstractResponseGenerator):
         except Exception:
             logger.exception("LLM generation failed after retries")
             return self.FALLBACK_RESPONSE
+
+    def extract_medical_data(self, doctor_question: str, patient_reply: str) -> dict:
+        prompt = (
+            "Ты медицинский ассистент. Извлеки данные из ответа пациента для медкарты.\n\n"
+            f"Вопрос врача: {doctor_question}\n"
+            f"Ответ пациента: {patient_reply}\n\n"
+            "Верни ТОЛЬКО валидный JSON без пояснений:\n"
+            "{\n"
+            '  "complaints": ["жалоба 1"],\n'
+            '  "anamnesis": ["факт анамнеза 1"],\n'
+            '  "diagnostics": ["обследование 1"]\n'
+            "}\n\n"
+            "Правила:\n"
+            "- complaints: текущие симптомы (боль, температура, слабость и т.д.)\n"
+            "- anamnesis: история болезни (когда началось, как развивалось)\n"
+            "- diagnostics: упомянутые анализы и обследования\n"
+            "- Если данных нет — пустой список []\n"
+            "- Кратко, от третьего лица: 'Жалуется на боль в животе'"
+        )
+        try:
+            raw = _invoke_gigachat([HumanMessage(content=prompt)])
+            clean = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+            data = json.loads(clean)
+            return {
+                "complaints": [str(x) for x in data.get("complaints", []) if x],
+                "anamnesis": [str(x) for x in data.get("anamnesis", []) if x],
+                "diagnostics": [str(x) for x in data.get("diagnostics", []) if x],
+            }
+        except Exception:
+            logger.exception("extract_medical_data failed")
+            return {"complaints": [], "anamnesis": [], "diagnostics": []}

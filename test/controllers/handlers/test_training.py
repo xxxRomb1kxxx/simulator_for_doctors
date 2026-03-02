@@ -8,7 +8,7 @@ from telegram.handlers.training import (
     control_case,
     start_case
 )
-from telegram.states.dialog import DialogState
+from dialog_engine.dialog_state import DialogState
 from models.entities.disease import DiseaseType
 from services.case_service import CaseInitResult
 

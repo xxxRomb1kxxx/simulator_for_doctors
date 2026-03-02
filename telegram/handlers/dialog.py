@@ -6,9 +6,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from telegram.keyboards.inline import dialog_control_keyboard
-from telegram.states.dialog import DialogState
-from services.case_service import CaseService
-
+from dialog_engine.dialog_state import DialogState
+from services.case_service import process_dialog,check_diagnosis
 router = Router(name="dialog")
 logger = logging.getLogger(__name__)
 
@@ -44,8 +43,8 @@ async def handle_dialog(msg: Message, state: FSMContext) -> None:
         await state.clear()
         return
 
-    result = CaseService.process_dialog(engine=engine, user_text=msg.text or "")
-    await msg.answer(result.answer_text, reply_markup=dialog_control_keyboard())
+    answer = process_dialog(engine=engine, user_text=msg.text or "")
+    await msg.answer(answer, reply_markup=dialog_control_keyboard())
 
 
 @router.message(DialogState.waiting_diagnosis)
@@ -62,7 +61,7 @@ async def handle_diagnosis(msg: Message, state: FSMContext) -> None:
         await state.clear()
         return
 
-    result = CaseService.check_diagnosis(
+    result = check_diagnosis(
         user_text=msg.text or "",
         patient=patient,
         card=card,

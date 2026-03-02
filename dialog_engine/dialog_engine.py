@@ -1,51 +1,98 @@
 import logging
+from typing import Any
 
-from dialog_engine.dialog_state import DialogState
 from giga.llm_response_generator import GigachatResponseGenerator
-from dialog_engine.patient_card_manager import PatientCardManager
-from models.entities.medical_card import MedicalCard
-from models.entities.patient import Patient
+from models.models import MedicalCard, Patient
 
 logger = logging.getLogger(__name__)
 
 
 class DialogEngine:
+    """Управляет диалогом врача с пациентом-симулятором."""
 
     def __init__(self, patient: Patient, card: MedicalCard) -> None:
-        self.dialog_state = DialogState()
-        self.patient_card_manager = PatientCardManager(patient, card)
-        self.llm_generator = GigachatResponseGenerator(
+        self.patient = patient
+        self.card = card
+        self._stage = "greeting"
+        self._history: list[dict[str, Any]] = []
+        self._llm = GigachatResponseGenerator(
             disease_name=patient.disease.name,
             complaints=patient.disease.complaints,
         )
         logger.info("DialogEngine initialized for patient %s", patient.fio)
 
     def process(self, text: str) -> str:
-        self.dialog_state.add_to_history("user", text)
+        self._history.append({"role": "user", "content": text})
 
-        if self.dialog_state.stage == "greeting":
-            response = self._handle_greeting(text)
+        if self._stage == "greeting":
+            context = self._build_context(
+                extra="Ты только что зашёл в кабинет врача. Это начало приёма."
+            )
+            self._stage = "dialog"
         else:
-            response = self._generate_response(text)
+            context = self._build_context()
 
-        self.dialog_state.add_to_history("assistant", response)
+        response = self._llm.generate_response(
+            context=context,
+            dialog_messages=self._history[-20:],
+        )
+        self._history.append({"role": "assistant", "content": response})
+
+        # ✅ FIX: заполняем карту после каждого ответа пациента
+        self._update_card(doctor_question=text, patient_reply=response)
+
         return response
 
-    def _handle_greeting(self, text: str) -> str:
-        additional = "Ты только что зашёл в кабинет врача. Это начало приёма."
-        context = self.patient_card_manager.get_disease_context() + f"\n\nДополнительно: {additional}"
-        response = self._call_llm(context)
-        self.dialog_state.transition_stage("dialog")
-        return response
+    def reset(self) -> None:
+        self._stage = "greeting"
+        self._history.clear()
+        logger.info("Dialog reset for patient %s", self.patient.fio)
 
-    def _generate_response(self, text: str) -> str:
-        context = self.patient_card_manager.get_disease_context()
-        return self._call_llm(context)
+    def _build_context(self, extra: str = "") -> str:
+        p, d = self.patient, self.patient.disease
+        ctx = (
+            f"Информация о моей болезни:\n"
+            f"  - Диагноз (скрыт от врача): {d.name}\n"
+            f"  - Основные симптомы: {', '.join(d.complaints)}\n"
+            f"  - История развития: {', '.join(d.anamnesis)}\n"
+            f"  - Проведённые обследования: {', '.join(d.diagnostics)}\n\n"
+            f"Мой профиль:\n"
+            f"  - Возраст: {p.age}\n"
+            f"  - Профессия: {p.profession}\n"
+            f"  - Пол: {p.gender}\n"
+        )
+        if self.card.complaints:
+            ctx += f"\nУже сообщённые жалобы: {', '.join(self.card.complaints)}"
+        if extra:
+            ctx += f"\n\nДополнительно: {extra}"
+        return ctx
 
-    def _call_llm(self, context: str) -> str:
-        recent = self.dialog_state.get_recent_history(20)
-        return self.llm_generator.generate_response(context=context, dialog_messages=recent)
+    def _update_card(self, doctor_question: str, patient_reply: str) -> None:
+        try:
+            data = self._llm.extract_medical_data(
+                doctor_question=doctor_question,
+                patient_reply=patient_reply,
+            )
+            self._merge_into_card(data)
+        except Exception:
+            logger.exception("Card update failed, skipping")
 
-    def reset_dialog(self) -> None:
-        self.dialog_state = DialogState()
-        logger.info("Dialog reset")
+    def _merge_into_card(self, data: dict) -> None:
+        existing_complaints  = {x.lower() for x in self.card.complaints}
+        existing_anamnesis   = {x.lower() for x in self.card.anamnesis}
+        existing_diagnostics = {x.lower() for x in self.card.diagnostics}
+
+        for item in data.get("complaints", []):
+            if item and item.lower() not in existing_complaints:
+                self.card.complaints.append(item)
+                existing_complaints.add(item.lower())
+
+        for item in data.get("anamnesis", []):
+            if item and item.lower() not in existing_anamnesis:
+                self.card.anamnesis.append(item)
+                existing_anamnesis.add(item.lower())
+
+        for item in data.get("diagnostics", []):
+            if item and item.lower() not in existing_diagnostics:
+                self.card.diagnostics.append(item)
+                existing_diagnostics.add(item.lower())

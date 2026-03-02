@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, User
 
 from telegram.handlers.dialog import finish_dialog, force_diagnosis, handle_diagnosis, handle_dialog
-from telegram.states.dialog import DialogState
+from dialog_engine.dialog_state import DialogState
 from services.case_service import DiagnosisResult, DialogResult
 
 
