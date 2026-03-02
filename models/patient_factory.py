@@ -1,121 +1,28 @@
 import random
-from typing import TypedDict
 
-from models.models import Disease, DiseaseType
-from models.models import Patient
+from models.models import Disease, DiseaseType, Patient
+from models.disease_registry import DISEASE_REGISTRY
 
-class DiseaseData(TypedDict):
-    name: str
-    complaints: list[str]
-    anamnesis: list[str]
-    diagnostics: list[str]
-    correct_diagnosis: str
-
-
-DISEASE_DATA: dict[DiseaseType, DiseaseData] = {
-    DiseaseType.APPENDICITIS: {
-        "name": "Аппендицит",
-        "complaints": [
-            "Острая боль в правой нижней части живота",
-            "Тошнота",
-            "Потеря аппетита",
-        ],
-        "anamnesis": [
-            "Симптомы начались около 6 часов назад",
-            "Сначала была боль вокруг пупка",
-            "Боль переместилась вправо вниз",
-        ],
-        "diagnostics": [
-            "Лейкоцитоз в анализе крови",
-            "Положительный симптом Щёткина-Блюмберга",
-            "УЗИ показало утолщение аппендикса",
-        ],
-        "correct_diagnosis": "Острый аппендицит",
-    },
-    DiseaseType.DIABETES: {
-        "name": "Сахарный диабет",
-        "complaints": [
-            "Сильная постоянная жажда",
-            "Частое мочеиспускание",
-            "Слабость",
-            "Сухость во рту",
-        ],
-        "anamnesis": [
-            "Симптомы нарастали постепенно в течение 3–4 месяцев",
-            "Заметил, что стал много пить",
-        ],
-        "diagnostics": [
-            "Глюкоза крови натощак 12.8 ммоль/л",
-            "Гликированный гемоглобин 9.2%",
-        ],
-        "correct_diagnosis": "Сахарный диабет 2 типа",
-    },
-    DiseaseType.ANEMIA: {
-        "name": "Анемия",
-        "complaints": [
-            "Постоянная слабость",
-            "Головокружение",
-            "Одышка при физической нагрузке",
-            "Бледность кожи",
-        ],
-        "anamnesis": [
-            "Состояние ухудшалось постепенно в течение нескольких месяцев",
-            "Стал замечать, что быстро устаю",
-        ],
-        "diagnostics": [
-            "Гемоглобин 85 г/л",
-            "Снижен уровень сывороточного железа",
-            "Цветовой показатель 0.7",
-        ],
-        "correct_diagnosis": "Железодефицитная анемия",
-    },
-    DiseaseType.TUBERCULOSIS: {
-        "name": "Туберкулёз",
-        "complaints": [
-            "Кашель более 3 недель",
-            "Потеря веса на 4 кг за месяц",
-            "Ночная потливость",
-            "Субфебрильная температура",
-        ],
-        "anamnesis": [
-            "Кашель начался около месяца назад",
-            "Сначала был сухим, теперь с мокротой",
-        ],
-        "diagnostics": [
-            "На рентгене инфильтративные изменения в верхней доле правого лёгкого",
-            "Мокрота на БК положительная",
-        ],
-        "correct_diagnosis": "Инфильтративный туберкулёз лёгких",
-    },
-    DiseaseType.EPILEPSY: {
-        "name": "Эпилепсия",
-        "complaints": [
-            "Периодические судорожные приступы",
-            "Потеря сознания во время приступов",
-            "Чувство страха перед приступом",
-        ],
-        "anamnesis": [
-            "Первый приступ был год назад",
-            "С тех пор приступы повторялись 2–3 раза",
-        ],
-        "diagnostics": [
-            "На ЭЭГ регистрируются эпилептические разряды",
-            "МРТ без структурных изменений",
-        ],
-        "correct_diagnosis": "Идиопатическая генерализованная эпилепсия",
-    },
+DISEASE_DATA = {
+    dt: {
+        "name": cfg.name,
+        "complaints": cfg.complaints,
+        "anamnesis": cfg.anamnesis,
+        "diagnostics": cfg.diagnostics,
+        "correct_diagnosis": cfg.correct_diagnosis,
+    }
+    for dt, cfg in DISEASE_REGISTRY.items()
 }
+disease_data = DISEASE_DATA
 
-# --- Возрастные диапазоны ---
 _AGE_RANGES: dict[DiseaseType, tuple[int, int]] = {
     DiseaseType.APPENDICITIS: (18, 40),
-    DiseaseType.DIABETES: (45, 65),
-    DiseaseType.ANEMIA: (25, 60),
+    DiseaseType.DIABETES:     (45, 65),
+    DiseaseType.ANEMIA:       (25, 60),
     DiseaseType.TUBERCULOSIS: (25, 50),
-    DiseaseType.EPILEPSY: (20, 35),
+    DiseaseType.EPILEPSY:     (20, 35),
 }
 
-# --- Пул пациентов (имена + пол) ---
 _MALE_PATIENTS = [
     ("Иванов Иван Иванович", "М"),
     ("Петров Сергей Александрович", "М"),
@@ -139,16 +46,16 @@ _PROFESSIONS = [
 
 
 def create_patient(disease_type: DiseaseType) -> Patient:
-    if disease_type not in DISEASE_DATA:
+    if disease_type not in DISEASE_REGISTRY:
         raise ValueError(f"Unknown disease type: {disease_type!r}")
 
-    data = DISEASE_DATA[disease_type]
+    cfg = DISEASE_REGISTRY[disease_type]
     disease = Disease(
-        name=data["name"],
-        complaints=data["complaints"],
-        anamnesis=data["anamnesis"],
-        diagnostics=data["diagnostics"],
-        correct_diagnosis=data["correct_diagnosis"],
+        name=cfg.name,
+        complaints=list(cfg.complaints),
+        anamnesis=list(cfg.anamnesis),
+        diagnostics=list(cfg.diagnostics),
+        correct_diagnosis=cfg.correct_diagnosis,
     )
 
     age_min, age_max = _AGE_RANGES[disease_type]
@@ -161,7 +68,3 @@ def create_patient(disease_type: DiseaseType) -> Patient:
         profession=random.choice(_PROFESSIONS),
         disease=disease,
     )
-
-
-# Публичный алиас для обратной совместимости тестов
-disease_data = DISEASE_DATA

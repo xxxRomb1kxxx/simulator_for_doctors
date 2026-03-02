@@ -1,6 +1,7 @@
 import json
 import logging
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import List
 
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -39,8 +40,15 @@ def _invoke_gigachat(messages: List[BaseMessage]) -> str:
     content = response.content or ""
     logger.info("LLM response received (%d chars)", len(content))
     return content.strip()
+#
+# @dataclass
+# class PatientResponse:
+#     text: str
+#     complaints: list[str]
+#     anamnesis: list[str]
+#     diagnostics: list[str]
 
-class AbstractResponseGenerator(ABC):
+class IResponseGenerator(ABC):
     FALLBACK_RESPONSE = (
         "Извините, я не совсем понял вопрос. Можете переформулировать?"
     )
@@ -49,11 +57,13 @@ class AbstractResponseGenerator(ABC):
     def generate_response(self, context: str, dialog_messages: list[dict],) -> str:
         pass
 
+class ICardParser(ABC):
+
     @abstractmethod
     def extract_medical_data(self, doctor_question: str, patient_reply: str) -> dict:
         pass
 
-class GigachatResponseGenerator(AbstractResponseGenerator):
+class GigachatResponseGenerator(IResponseGenerator):
 
     def __init__(self, disease_name: str, complaints: list[str]) -> None:
         self.system_prompt = SystemPromptGenerator.get_system_prompt(disease_name,complaints,)
@@ -101,6 +111,8 @@ class GigachatResponseGenerator(AbstractResponseGenerator):
             logger.exception("LLM generation failed after retries")
             return self.FALLBACK_RESPONSE
 
+
+class GigachatCardParser(ICardParser):
     def extract_medical_data(self, doctor_question: str, patient_reply: str) -> dict:
         prompt = (
             "Ты медицинский ассистент. Извлеки данные из ответа пациента для медкарты.\n\n"

@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from giga.llm_response_generator import GigachatResponseGenerator
+from giga.llm_response_generator import GigachatResponseGenerator, GigachatCardParser, IResponseGenerator, ICardParser
 from models.models import MedicalCard, Patient
 
 logger = logging.getLogger(__name__)
@@ -10,15 +10,22 @@ logger = logging.getLogger(__name__)
 class DialogEngine:
     """Управляет диалогом врача с пациентом-симулятором."""
 
-    def __init__(self, patient: Patient, card: MedicalCard) -> None:
+    def __init__(
+        self,
+        patient: Patient,
+        card: MedicalCard,
+        llm: IResponseGenerator |None = None,
+        card_parser: ICardParser |None = None,
+    ) -> None:
         self.patient = patient
         self.card = card
         self._stage = "greeting"
         self._history: list[dict[str, Any]] = []
-        self._llm = GigachatResponseGenerator(
+        self._llm: IResponseGenerator = llm or GigachatResponseGenerator(
             disease_name=patient.disease.name,
             complaints=patient.disease.complaints,
         )
+        self._card_parser: ICardParser = card_parser or GigachatCardParser()
         logger.info("DialogEngine initialized for patient %s", patient.fio)
 
     def process(self, text: str) -> str:
@@ -37,8 +44,6 @@ class DialogEngine:
             dialog_messages=self._history[-20:],
         )
         self._history.append({"role": "assistant", "content": response})
-
-        # ✅ FIX: заполняем карту после каждого ответа пациента
         self._update_card(doctor_question=text, patient_reply=response)
 
         return response
@@ -69,7 +74,7 @@ class DialogEngine:
 
     def _update_card(self, doctor_question: str, patient_reply: str) -> None:
         try:
-            data = self._llm.extract_medical_data(
+            data = self._card_parser.extract_medical_data(
                 doctor_question=doctor_question,
                 patient_reply=patient_reply,
             )
