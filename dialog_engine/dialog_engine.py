@@ -71,12 +71,17 @@ class KafkaLLM(IResponseGenerator):
         )
 
     def _wait_for_response(self, correlation_id: str) -> dict | None:
-        """Слушаем gigachat-res пока не придёт ответ с нашим correlation_id."""
+        """Слушаем gigachat-res пока не придёт ответ с нашим correlation_id.
+
+        ВАЖНО: auto.offset.reset=earliest — иначе при создании новой consumer group
+        мы начнём читать только новые сообщения. Если воркер ответил раньше,
+        чем мы подписались — ответ будет пропущен и бот всегда будет ждать таймаут.
+        """
         settings = get_settings()
         consumer = Consumer({
             "bootstrap.servers": settings.kafka_bootstrap_servers,
-            "group.id": f"bot-response-{self.user_id}-{correlation_id[:8]}",
-            "auto.offset.reset": "latest",
+            "group.id": f"bot-response-{self.user_id}-{correlation_id}",  # ← полный id, не [:8]
+            "auto.offset.reset": "earliest",  # ← было "latest" — главный баг
             "enable.auto.commit": True,
         })
         consumer.subscribe([TOPIC_RES])

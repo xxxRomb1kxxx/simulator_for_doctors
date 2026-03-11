@@ -11,6 +11,8 @@ from config import setup_logging, get_settings
 from telegram.handlers import dialog, menu, training
 from telegram.keyboards.inline import set_bot_commands
 from middlewares.logging import LoggingMiddleware
+from services.gigachat_worker import start_workers
+from services.kafka_service import flush_producer
 
 logger = logging.getLogger(__name__)
 
@@ -30,12 +32,16 @@ async def on_startup(bot: Bot) -> None:
     await set_bot_commands(bot)
     logger.info("Bot started: @%s (id=%d)", me.username, me.id)
 
+    settings = get_settings()
+    if settings.kafka_enabled:
+        start_workers()
+        logger.info("GigaChat Kafka workers started")
+
 async def on_shutdown(bot: Bot) -> None:
     logger.info("Bot shutting down...")
     settings = get_settings()
     if settings.kafka_enabled:
         try:
-            from services.kafka_service import flush_producer
             flush_producer()
         except Exception as exc:
             logger.warning("Kafka flush failed on shutdown: %s", exc)

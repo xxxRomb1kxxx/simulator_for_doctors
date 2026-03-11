@@ -1,24 +1,23 @@
 """
 Воркер: читает запросы из Kafka-топика gigachat-req,
 вызывает GigaChat и кладёт ответ в gigachat-res.
-Количество воркеров = количество параллельных потоков к GigaChat.
 """
 import json
 import logging
 import threading
 import time
 from confluent_kafka import Consumer, Producer
+from config import get_settings  # ← добавлен импорт
 
 logger = logging.getLogger(__name__)
 
 TOPIC_REQ = "gigachat-req"
 TOPIC_RES = "gigachat-res"
-BOOTSTRAP = "localhost:9092"
-NUM_WORKERS = 3  # не больше чем rate-limit GigaChat
+# BOOTSTRAP = "localhost:9092"  брать из settings
+NUM_WORKERS = 3
 
 
 def process_one(msg_value: dict) -> dict:
-    """Реальный вызов GigaChat. Подключаем твой существующий движок."""
     from giga.llm_response_generator import GigachatResponseGenerator
 
     user_id = msg_value["user_id"]
@@ -40,14 +39,15 @@ def process_one(msg_value: dict) -> dict:
 
 
 def worker_loop(worker_id: int):
+    bootstrap = get_settings().kafka_bootstrap_servers  # ← берём из settings
     consumer = Consumer({
-        "bootstrap.servers": BOOTSTRAP,
+        "bootstrap.servers": bootstrap,
         "group.id": "gigachat-workers",
         "auto.offset.reset": "latest",
         "enable.auto.commit": False,
         "max.poll.interval.ms": 60000,
     })
-    producer = Producer({"bootstrap.servers": BOOTSTRAP})
+    producer = Producer({"bootstrap.servers": bootstrap})
 
     consumer.subscribe([TOPIC_REQ])
     logger.info("[Worker %d] started", worker_id)
@@ -64,6 +64,9 @@ def worker_loop(worker_id: int):
             data = json.loads(msg.value())
             result = process_one(data)
 
+            # ← ДОБАВЛЕНО: пробрасываем correlation_id, иначе KafkaLLM не найдёт свой ответ
+            result["correlation_id"] = data.get("correlation_id")
+
             producer.produce(
                 TOPIC_RES,
                 key=str(data["user_id"]).encode(),
@@ -75,7 +78,6 @@ def worker_loop(worker_id: int):
 
         except Exception as e:
             logger.error("[Worker %d] failed: %s", worker_id, e)
-            # НЕ делаем commit — сообщение вернётся в очередь
             time.sleep(1)
 
 
@@ -91,7 +93,6 @@ def start_workers():
 
 if __name__ == "__main__":
     import sys
-
     logging.basicConfig(level=logging.INFO)
     threads = start_workers()
     try:

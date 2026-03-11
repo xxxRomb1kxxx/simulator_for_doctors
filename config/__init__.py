@@ -42,6 +42,17 @@ class Settings(BaseSettings):
             raise ValueError(f"log_level must be one of {allowed}")
         return upper
 
+    @field_validator("kafka_bootstrap_servers")
+    @classmethod
+    def validate_kafka_servers(cls, v: str) -> str:
+        servers = [s.strip() for s in v.split(",")]
+        for server in servers:
+            if ":" not in server:
+                raise ValueError(
+                    f"kafka_bootstrap_servers: неверный формат '{server}', "
+                    f"ожидается host:port"
+                )
+        return ",".join(servers)
 
 def setup_logging(level: str = "INFO") -> None:
     logging.basicConfig(
@@ -49,7 +60,6 @@ def setup_logging(level: str = "INFO") -> None:
         format=LOG_FORMAT,
         handlers=[logging.StreamHandler(sys.stdout)],
     )
-
 
 _settings: Settings | None = None
 
