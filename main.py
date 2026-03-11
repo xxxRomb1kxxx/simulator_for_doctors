@@ -7,8 +7,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from config import setup_logging
-from config import get_settings
+from config import setup_logging, get_settings
 from telegram.handlers import dialog, menu, training
 from telegram.keyboards.inline import set_bot_commands
 from middlewares.logging import LoggingMiddleware
@@ -24,20 +23,23 @@ def build_dispatcher() -> Dispatcher:
     dp.include_router(menu.router)
     dp.include_router(training.router)
     dp.include_router(dialog.router)
-
     return dp
-
 
 async def on_startup(bot: Bot) -> None:
     me = await bot.get_me()
     await set_bot_commands(bot)
     logger.info("Bot started: @%s (id=%d)", me.username, me.id)
 
-
 async def on_shutdown(bot: Bot) -> None:
     logger.info("Bot shutting down...")
+    settings = get_settings()
+    if settings.kafka_enabled:
+        try:
+            from services.kafka_service import flush_producer
+            flush_producer()
+        except Exception as exc:
+            logger.warning("Kafka flush failed on shutdown: %s", exc)
     await bot.session.close()
-
 
 async def main() -> None:
     settings = get_settings()

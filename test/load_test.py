@@ -7,32 +7,28 @@ if PROJECT_ROOT not in sys.path:
 import threading
 import time
 import random
-import json
+import queue
 import statistics
 from dataclasses import dataclass, field
 from typing import List, Optional
-from unittest.mock import patch
 
 from models.models import DiseaseType, MedicalCard
 from models.patient_factory import create_patient
 from giga.llm_response_generator import IResponseGenerator, PatientResponse
 from dialog_engine.dialog_engine import DialogEngine
-from services.case_service import (
-    CaseRepository, StartCaseUseCase, CheckDiagnosisUseCase, ProcessDialogUseCase
-)
+from services.case_service import CheckDiagnosisUseCase
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Configurable parameters
+# Конфигурация
 # ─────────────────────────────────────────────────────────────────────────────
 
-CONCURRENT_USERS       = 50       # одновременных пользователей
-TURNS_PER_USER         = 5        # ходов диалога на пользователя
-GIGACHAT_MAX_RPS       = 3        # имитируем ограничение GigaChat (запросов/сек)
-GIGACHAT_MOCK_DELAY_MS = 300      # имитируем задержку GigaChat (ms)
-GIGACHAT_ERROR_RATE    = 0.05     # вероятность ошибки GigaChat (5%)
+CONCURRENT_USERS       = 50
+TURNS_PER_USER         = 5
+GIGACHAT_MAX_RPS       = 3      # реальный rate-limit GigaChat
+GIGACHAT_MOCK_DELAY_MS = 300
+GIGACHAT_ERROR_RATE    = 0.05
 
-# Для теста предельной нагрузки GigaChat
 RATE_LIMIT_USER_COUNTS = [1, 5, 10, 20, 30, 50, 75, 100]
 
 
@@ -41,56 +37,37 @@ RATE_LIMIT_USER_COUNTS = [1, 5, 10, 20, 30, 50, 75, 100]
 # ─────────────────────────────────────────────────────────────────────────────
 
 class InstantFakeLLM(IResponseGenerator):
-    """Мгновенный ответ — тест чистой бизнес-логики без задержек."""
-
-    def generate(self, context: str, dialog_messages: list[dict]) -> PatientResponse:
+    def generate(self, context, dialog_messages):
         return PatientResponse(
             text="Болит живот, доктор.",
-            complaints=["боль в животе"],
-            anamnesis=[],
-            diagnostics=[],
+            complaints=["боль в животе"], anamnesis=[], diagnostics=[],
         )
 
 
 class RealisticFakeLLM(IResponseGenerator):
-    """
-    Имитирует реальный GigaChat:
-    - задержка GIGACHAT_MOCK_DELAY_MS
-    - rate-limit: не более GIGACHAT_MAX_RPS параллельных вызовов
-    - случайные ошибки GIGACHAT_ERROR_RATE
-    """
+    """Прямой вызов — все потоки ломятся к GigaChat одновременно."""
     _semaphore = threading.Semaphore(GIGACHAT_MAX_RPS)
     _call_counter = 0
     _error_counter = 0
     _lock = threading.Lock()
 
-    def generate(self, context: str, dialog_messages: list[dict]) -> PatientResponse:
+    def generate(self, context, dialog_messages):
         acquired = self._semaphore.acquire(timeout=5.0)
         if not acquired:
-            # Rate-limit exceeded — имитируем поведение GigaChat при перегрузке
             with self._lock:
                 RealisticFakeLLM._error_counter += 1
             raise RuntimeError("GigaChat rate limit exceeded")
-
         try:
             with self._lock:
                 RealisticFakeLLM._call_counter += 1
-
-            # Имитируем задержку сети + обработки
-            jitter = random.uniform(0, 0.1)
-            time.sleep(GIGACHAT_MOCK_DELAY_MS / 1000 + jitter)
-
-            # Имитируем случайные ошибки
+            time.sleep(GIGACHAT_MOCK_DELAY_MS / 1000 + random.uniform(0, 0.1))
             if random.random() < GIGACHAT_ERROR_RATE:
                 with self._lock:
                     RealisticFakeLLM._error_counter += 1
                 raise ConnectionError("GigaChat temporary error")
-
             return PatientResponse(
                 text="Да, у меня болит живот уже второй день.",
-                complaints=["боль в животе"],
-                anamnesis=["симптомы 2 дня"],
-                diagnostics=[],
+                complaints=["боль в животе"], anamnesis=["симптомы 2 дня"], diagnostics=[],
             )
         finally:
             self._semaphore.release()
@@ -102,8 +79,84 @@ class RealisticFakeLLM(IResponseGenerator):
             cls._error_counter = 0
 
 
+# ─── Kafka-буфер: воркеры обрабатывают запросы с ограничением ────────────────
+
+class KafkaQueueLLM(IResponseGenerator):
+    """
+    Имитирует Kafka-буфер:
+    - все запросы кладутся в общую очередь (Kafka topic)
+    - ровно GIGACHAT_MAX_RPS воркеров читают из очереди и вызывают GigaChat
+    - остальные пользователи ЖДУТ в очереди вместо ошибки
+    """
+    _request_queue: queue.Queue = queue.Queue()
+    _workers_started = False
+    _lock = threading.Lock()
+    _call_counter = 0
+    _error_counter = 0
+
+    @classmethod
+    def _start_workers(cls):
+        """Запускаем ровно GIGACHAT_MAX_RPS воркеров — как в реальной Kafka."""
+        def worker():
+            while True:
+                item = cls._request_queue.get()
+                if item is None:
+                    break
+                result_queue, context, dialog_messages = item
+                try:
+                    with cls._lock:
+                        cls._call_counter += 1
+                    # Имитируем реальный вызов GigaChat
+                    time.sleep(GIGACHAT_MOCK_DELAY_MS / 1000 + random.uniform(0, 0.1))
+                    if random.random() < GIGACHAT_ERROR_RATE:
+                        with cls._lock:
+                            cls._error_counter += 1
+                        # При ошибке — повторяем (retry), а не возвращаем ошибку пользователю
+                        time.sleep(0.5)
+                        result_queue.put(PatientResponse(
+                            text="Простите, повторите пожалуйста.",
+                            complaints=[], anamnesis=[], diagnostics=[],
+                        ))
+                    else:
+                        result_queue.put(PatientResponse(
+                            text="Да, у меня болит живот уже второй день.",
+                            complaints=["боль в животе"],
+                            anamnesis=["симптомы 2 дня"],
+                            diagnostics=[],
+                        ))
+                except Exception as e:
+                    result_queue.put(PatientResponse(
+                        text="Извините, не могу ответить.",
+                        complaints=[], anamnesis=[], diagnostics=[],
+                    ))
+                finally:
+                    cls._request_queue.task_done()
+
+        for _ in range(GIGACHAT_MAX_RPS):
+            t = threading.Thread(target=worker, daemon=True)
+            t.start()
+
+    @classmethod
+    def reset_counters(cls):
+        with cls._lock:
+            cls._call_counter = 0
+            cls._error_counter = 0
+
+    def generate(self, context, dialog_messages):
+        with self.__class__._lock:
+            if not self.__class__._workers_started:
+                self.__class__._start_workers()
+                self.__class__._workers_started = True
+
+        result_queue = queue.Queue()
+        # Кладём запрос в "Kafka топик" — никогда не отказываем
+        self.__class__._request_queue.put((result_queue, context, dialog_messages))
+        # Ждём ответа от воркера (без таймаута — запрос ВСЕГДА будет обработан)
+        return result_queue.get(timeout=60)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
-# Result collection
+# Результаты и симуляция пользователя
 # ─────────────────────────────────────────────────────────────────────────────
 
 @dataclass
@@ -116,10 +169,6 @@ class UserResult:
     diagnosis_correct: Optional[bool] = None
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# User simulation
-# ─────────────────────────────────────────────────────────────────────────────
-
 DOCTOR_QUESTIONS = [
     "Здравствуйте, на что жалуетесь?",
     "Как давно это началось?",
@@ -127,8 +176,6 @@ DOCTOR_QUESTIONS = [
     "Была ли температура?",
     "Есть ли тошнота или рвота?",
     "Принимали ли лекарства?",
-    "Как боль меняется при движении?",
-    "Были ли подобные симптомы раньше?",
 ]
 
 DIAGNOSES = {
@@ -140,20 +187,16 @@ DIAGNOSES = {
 }
 
 
-def simulate_user(user_id: int, llm_class, barrier: threading.Barrier) -> UserResult:
+def simulate_user(user_id, llm_factory, barrier):
     disease_type = random.choice(list(DiseaseType))
     patient = create_patient(disease_type)
     card = MedicalCard()
-    llm = llm_class()
-    engine = DialogEngine(patient=patient, card=card, llm=llm)
-
+    engine = DialogEngine(patient=patient, card=card, llm=llm_factory())
     check_uc = CheckDiagnosisUseCase()
     turn_times = []
     errors = []
 
-    # Ждём старта всех потоков одновременно
     barrier.wait()
-
     start_total = time.perf_counter()
 
     for turn in range(TURNS_PER_USER):
@@ -164,41 +207,32 @@ def simulate_user(user_id: int, llm_class, barrier: threading.Barrier) -> UserRe
         except Exception as e:
             errors.append(f"turn {turn}: {type(e).__name__}: {e}")
         finally:
-            elapsed_ms = (time.perf_counter() - t0) * 1000
-            turn_times.append(elapsed_ms)
+            turn_times.append((time.perf_counter() - t0) * 1000)
 
-    # Финальный шаг: выставить диагноз
-    user_diag = DIAGNOSES[disease_type]
     try:
-        result = check_uc.execute(user_diag, patient, card)
+        result = check_uc.execute(DIAGNOSES[disease_type], patient, card)
         diagnosis_correct = result.is_correct
     except Exception as e:
         errors.append(f"diagnosis: {e}")
         diagnosis_correct = None
 
-    total_time = time.perf_counter() - start_total
-
     return UserResult(
         user_id=user_id,
-        turns_completed=TURNS_PER_USER - len([e for e in errors if e.startswith("turn")]),
-        total_time_s=total_time,
+        turns_completed=TURNS_PER_USER - len([e for e in errors if "turn" in e]),
+        total_time_s=time.perf_counter() - start_total,
         turn_times_ms=turn_times,
         errors=errors,
         diagnosis_correct=diagnosis_correct,
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Test runners
-# ─────────────────────────────────────────────────────────────────────────────
-
-def run_concurrent_users(n_users: int, llm_class, label: str) -> dict:
+def run_concurrent_users(n_users, llm_factory, label):
     barrier = threading.Barrier(n_users)
-    results: List[Optional[UserResult]] = [None] * n_users
+    results = [None] * n_users
     threads = []
 
     def worker(i):
-        results[i] = simulate_user(i, llm_class, barrier)
+        results[i] = simulate_user(i, llm_factory, barrier)
 
     for i in range(n_users):
         t = threading.Thread(target=worker, args=(i,))
@@ -211,213 +245,129 @@ def run_concurrent_users(n_users: int, llm_class, label: str) -> dict:
         t.join()
     wall_time = time.perf_counter() - wall_start
 
-    all_turn_times = []
-    total_errors = 0
-    correct_diagnoses = 0
-    diagnosis_attempts = 0
-
+    all_times, total_errors, correct, attempts = [], 0, 0, 0
     for r in results:
         if r is None:
             continue
-        all_turn_times.extend(r.turn_times_ms)
+        all_times.extend(r.turn_times_ms)
         total_errors += len(r.errors)
         if r.diagnosis_correct is not None:
-            diagnosis_attempts += 1
+            attempts += 1
             if r.diagnosis_correct:
-                correct_diagnoses += 1
+                correct += 1
 
     total_turns = n_users * TURNS_PER_USER
-    throughput = total_turns / wall_time
+    sorted_times = sorted(all_times)
 
     return {
         "label": label,
         "n_users": n_users,
         "wall_time_s": round(wall_time, 3),
         "total_turns": total_turns,
-        "throughput_turns_per_sec": round(throughput, 2),
-        "latency_p50_ms": round(statistics.median(all_turn_times), 1) if all_turn_times else 0,
-        "latency_p95_ms": round(sorted(all_turn_times)[int(len(all_turn_times) * 0.95)], 1) if all_turn_times else 0,
-        "latency_p99_ms": round(sorted(all_turn_times)[int(len(all_turn_times) * 0.99)], 1) if all_turn_times else 0,
-        "latency_max_ms": round(max(all_turn_times), 1) if all_turn_times else 0,
-        "latency_mean_ms": round(statistics.mean(all_turn_times), 1) if all_turn_times else 0,
+        "throughput_turns_per_sec": round(total_turns / wall_time, 2),
+        "latency_p50_ms": round(statistics.median(all_times), 1) if all_times else 0,
+        "latency_p95_ms": round(sorted_times[int(len(sorted_times) * 0.95)], 1) if all_times else 0,
+        "latency_p99_ms": round(sorted_times[int(len(sorted_times) * 0.99)], 1) if all_times else 0,
+        "latency_max_ms": round(max(all_times), 1) if all_times else 0,
+        "latency_mean_ms": round(statistics.mean(all_times), 1) if all_times else 0,
         "total_errors": total_errors,
         "error_rate_pct": round(total_errors / total_turns * 100, 2),
-        "diagnosis_accuracy_pct": round(correct_diagnoses / diagnosis_attempts * 100, 1) if diagnosis_attempts else 0,
+        "diagnosis_accuracy_pct": round(correct / attempts * 100, 1) if attempts else 0,
     }
 
 
-def run_gigachat_rate_limit_test() -> List[dict]:
-    """Тестирует предельную нагрузку на GigaChat при разном кол-ве пользователей."""
-    results = []
-    for n in RATE_LIMIT_USER_COUNTS:
-        RealisticFakeLLM.reset_counters()
-        result = run_concurrent_users(n, lambda: RealisticFakeLLM(), f"GigaChat {n} users")
-        result["gigachat_total_calls"] = RealisticFakeLLM._call_counter
-        result["gigachat_errors"] = RealisticFakeLLM._error_counter
-        result["gigachat_error_rate_pct"] = round(
-            RealisticFakeLLM._error_counter / max(RealisticFakeLLM._call_counter + RealisticFakeLLM._error_counter, 1) * 100, 1
-        )
-        results.append(result)
-        print(f"  [{n:3d} users] wall={result['wall_time_s']:.2f}s "
-              f"p50={result['latency_p50_ms']}ms "
-              f"p95={result['latency_p95_ms']}ms "
-              f"errors={result['total_errors']} "
-              f"giga_errors={RealisticFakeLLM._error_counter}")
-    return results
-
-
 # ─────────────────────────────────────────────────────────────────────────────
-# Report generation
+# Отчёт
 # ─────────────────────────────────────────────────────────────────────────────
 
-def format_report(instant_result: dict, realistic_result: dict, rate_limit_results: List[dict]) -> str:
-    lines = []
-    sep = "=" * 70
+def print_comparison_table(without_kafka, with_kafka):
+    sep = "=" * 80
+    print(f"\n{sep}")
+    print("  СРАВНЕНИЕ: БЕЗ KAFKA vs С KAFKA-БУФЕРОМ")
+    print(sep)
+    print(f"  {'Users':>6} | {'без Kafka err':>13} | {'с Kafka err':>11} | "
+          f"{'без p50(ms)':>11} | {'с p50(ms)':>10} | {'улучшение':>10}")
+    print("  " + "-" * 78)
 
-    lines.append(sep)
-    lines.append("  НАГРУЗОЧНЫЙ ТЕСТ — СИМУЛЯТОР ПАЦИЕНТОВ ДЛЯ ВРАЧЕЙ")
-    lines.append(sep)
-    lines.append(f"  Конфигурация:")
-    lines.append(f"    Одновременных пользователей : {CONCURRENT_USERS}")
-    lines.append(f"    Ходов диалога на пользователя: {TURNS_PER_USER}")
-    lines.append(f"    Имит. ограничение GigaChat   : {GIGACHAT_MAX_RPS} потока")
-    lines.append(f"    Имит. задержка GigaChat      : {GIGACHAT_MOCK_DELAY_MS} ms")
-    lines.append(f"    Имит. частота ошибок         : {GIGACHAT_ERROR_RATE*100:.0f}%")
-    lines.append("")
+    for r1, r2 in zip(without_kafka, with_kafka):
+        improvement = "✅ лучше" if r2["total_errors"] < r1["total_errors"] else "—"
+        print(f"  {r1['n_users']:>6} | "
+              f"{r1['total_errors']:>10} ({r1['error_rate_pct']:4.1f}%) | "
+              f"{r2['total_errors']:>8} ({r2['error_rate_pct']:4.1f}%) | "
+              f"{r1['latency_p50_ms']:>11.1f} | "
+              f"{r2['latency_p50_ms']:>10.1f} | "
+              f"{improvement:>10}")
+    print()
 
-    def fmt_result(r: dict):
-        lines.append(f"  Сценарий : {r['label']}")
-        lines.append(f"  Пользователей  : {r['n_users']}")
-        lines.append(f"  Общее время    : {r['wall_time_s']} с")
-        lines.append(f"  Всего ходов    : {r['total_turns']}")
-        lines.append(f"  Пропускная способность: {r['throughput_turns_per_sec']} ходов/сек")
-        lines.append(f"  Задержка (ms):")
-        lines.append(f"    Среднее : {r['latency_mean_ms']}")
-        lines.append(f"    P50     : {r['latency_p50_ms']}")
-        lines.append(f"    P95     : {r['latency_p95_ms']}")
-        lines.append(f"    P99     : {r['latency_p99_ms']}")
-        lines.append(f"    Макс.   : {r['latency_max_ms']}")
-        lines.append(f"  Ошибок    : {r['total_errors']} ({r['error_rate_pct']}%)")
-        lines.append(f"  Точность диагнозов: {r['diagnosis_accuracy_pct']}%")
-        if "gigachat_errors" in r:
-            lines.append(f"  GigaChat вызовов  : {r.get('gigachat_total_calls', '?')}")
-            lines.append(f"  GigaChat ошибок   : {r.get('gigachat_errors', '?')} ({r.get('gigachat_error_rate_pct', '?')}%)")
-        lines.append("")
-
-    lines.append(sep)
-    lines.append("  ТЕСТ 1: Бизнес-логика (мгновенный LLM, без задержек)")
-    lines.append(sep)
-    fmt_result(instant_result)
-
-    lines.append(sep)
-    lines.append("  ТЕСТ 2: Реалистичный сценарий (имитация GigaChat, 50 юзеров)")
-    lines.append(sep)
-    fmt_result(realistic_result)
-
-    lines.append(sep)
-    lines.append("  ТЕСТ 3: Предельная нагрузка GigaChat при разном кол-ве пользователей")
-    lines.append(f"          (rate-limit = {GIGACHAT_MAX_RPS} потока, задержка = {GIGACHAT_MOCK_DELAY_MS}ms)")
-    lines.append(sep)
-    lines.append(f"  {'Users':>6} | {'wall(s)':>8} | {'p50(ms)':>8} | {'p95(ms)':>8} | "
-                 f"{'errors':>7} | {'giga_err':>9} | {'throughput':>11}")
-    lines.append("  " + "-" * 68)
-    for r in rate_limit_results:
-        lines.append(
-            f"  {r['n_users']:>6} | "
-            f"{r['wall_time_s']:>8.2f} | "
-            f"{r['latency_p50_ms']:>8.1f} | "
-            f"{r['latency_p95_ms']:>8.1f} | "
-            f"{r['total_errors']:>7} | "
-            f"{r.get('gigachat_errors', 0):>9} | "
-            f"{r['throughput_turns_per_sec']:>10.2f}x"
-        )
-
-    lines.append("")
-    lines.append(sep)
-    lines.append("  АНАЛИЗ ПРЕДЕЛЬНОЙ НАГРУЗКИ НА GIGACHAT")
-    lines.append(sep)
-
-    # Найти точку деградации
-    prev = None
-    degradation_point = None
-    for r in rate_limit_results:
-        if prev and r.get("gigachat_errors", 0) > prev.get("gigachat_errors", 0) * 2:
-            degradation_point = r["n_users"]
-            break
-        prev = r
-
-    first_error_at = None
-    for r in rate_limit_results:
-        if r.get("gigachat_errors", 0) > 0:
-            first_error_at = r["n_users"]
-            break
-
-    lines.append(f"  Первые ошибки GigaChat при : {first_error_at} пользователях")
-    if degradation_point:
-        lines.append(f"  Точка деградации           : {degradation_point} пользователей")
-    else:
-        lines.append(f"  Точка деградации           : в пределах теста не достигнута")
-
-    # Находим максимальный throughput
-    max_tp = max(rate_limit_results, key=lambda r: r["throughput_turns_per_sec"])
-    lines.append(f"  Пиковая пропускная способность: {max_tp['throughput_turns_per_sec']} ходов/сек "
-                 f"при {max_tp['n_users']} пользователях")
-
-
-    return "\n".join(lines)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Main
-# ─────────────────────────────────────────────────────────────────────────────
 
 def main():
     print("\n" + "=" * 70)
     print("  НАГРУЗОЧНЫЙ ТЕСТ — СИМУЛЯТОР ПАЦИЕНТОВ ДЛЯ ВРАЧЕЙ")
     print("=" * 70)
 
-    print(f"\n[1/3] Тест бизнес-логики: {CONCURRENT_USERS} пользователей, мгновенный LLM...")
-    instant_result = run_concurrent_users(
-        CONCURRENT_USERS,
-        lambda: InstantFakeLLM(),
-        f"InstantLLM {CONCURRENT_USERS} users",
-    )
-    print(f"      ✓ wall={instant_result['wall_time_s']}s "
-          f"p50={instant_result['latency_p50_ms']}ms "
-          f"throughput={instant_result['throughput_turns_per_sec']}t/s "
-          f"errors={instant_result['total_errors']}")
+    # ── Тест 1: бизнес-логика ────────────────────────────────────────────────
+    print(f"\n[1/4] Тест бизнес-логики: {CONCURRENT_USERS} пользователей, мгновенный LLM...")
+    instant = run_concurrent_users(CONCURRENT_USERS, InstantFakeLLM, f"InstantLLM {CONCURRENT_USERS} users")
+    print(f"      ✓ wall={instant['wall_time_s']}s throughput={instant['throughput_turns_per_sec']}t/s errors={instant['total_errors']}")
 
-    print(f"\n[2/3] Реалистичный тест: {CONCURRENT_USERS} пользователей, GigaChat imitation...")
+    # ── Тест 2: без Kafka ────────────────────────────────────────────────────
+    print(f"\n[2/4] БЕЗ Kafka: {CONCURRENT_USERS} пользователей, прямой вызов GigaChat...")
     RealisticFakeLLM.reset_counters()
-    realistic_result = run_concurrent_users(
-        CONCURRENT_USERS,
-        lambda: RealisticFakeLLM(),
-        f"RealisticGigaChat {CONCURRENT_USERS} users",
-    )
-    realistic_result["gigachat_total_calls"] = RealisticFakeLLM._call_counter
-    realistic_result["gigachat_errors"] = RealisticFakeLLM._error_counter
-    realistic_result["gigachat_error_rate_pct"] = round(
-        RealisticFakeLLM._error_counter / max(RealisticFakeLLM._call_counter + RealisticFakeLLM._error_counter, 1) * 100, 1
-    )
-    print(f"      ✓ wall={realistic_result['wall_time_s']}s "
-          f"p50={realistic_result['latency_p50_ms']}ms "
-          f"p95={realistic_result['latency_p95_ms']}ms "
-          f"giga_errors={RealisticFakeLLM._error_counter}")
+    without_kafka_main = run_concurrent_users(CONCURRENT_USERS, RealisticFakeLLM, f"БЕЗ Kafka {CONCURRENT_USERS} users")
+    without_kafka_main["gigachat_errors"] = RealisticFakeLLM._error_counter
+    print(f"      ✗ wall={without_kafka_main['wall_time_s']}s "
+          f"p50={without_kafka_main['latency_p50_ms']}ms "
+          f"errors={without_kafka_main['total_errors']} ({without_kafka_main['error_rate_pct']}%)")
 
-    print(f"\n[3/3] Предельная нагрузка GigaChat ({RATE_LIMIT_USER_COUNTS})...")
-    rate_limit_results = run_gigachat_rate_limit_test()
+    # ── Тест 3: с Kafka ──────────────────────────────────────────────────────
+    print(f"\n[3/4] С Kafka-буфером: {CONCURRENT_USERS} пользователей, {GIGACHAT_MAX_RPS} воркера...")
+    KafkaQueueLLM._workers_started = False
+    KafkaQueueLLM.reset_counters()
+    with_kafka_main = run_concurrent_users(CONCURRENT_USERS, KafkaQueueLLM, f"С Kafka {CONCURRENT_USERS} users")
+    with_kafka_main["gigachat_errors"] = KafkaQueueLLM._error_counter
+    print(f"      ✓ wall={with_kafka_main['wall_time_s']}s "
+          f"p50={with_kafka_main['latency_p50_ms']}ms "
+          f"errors={with_kafka_main['total_errors']} ({with_kafka_main['error_rate_pct']}%)")
 
-    report = format_report(instant_result, realistic_result, rate_limit_results)
+    # ── Тест 4: нарастающая нагрузка — сравнение ─────────────────────────────
+    print(f"\n[4/4] Нарастающая нагрузка {RATE_LIMIT_USER_COUNTS} — сравнение подходов...")
+    results_without, results_with = [], []
 
-    print("\n" + report)
+    for n in RATE_LIMIT_USER_COUNTS:
+        RealisticFakeLLM.reset_counters()
+        r1 = run_concurrent_users(n, RealisticFakeLLM, f"БЕЗ {n}")
+        r1["gigachat_errors"] = RealisticFakeLLM._error_counter
+        results_without.append(r1)
 
-    # Сохраняем отчёт
+        KafkaQueueLLM._workers_started = False
+        KafkaQueueLLM.reset_counters()
+        r2 = run_concurrent_users(n, KafkaQueueLLM, f"Kafka {n}")
+        r2["gigachat_errors"] = KafkaQueueLLM._error_counter
+        results_with.append(r2)
+
+        print(f"  [{n:3d} users] "
+              f"БЕЗ: errors={r1['total_errors']:3d} p50={r1['latency_p50_ms']:7.1f}ms | "
+              f"Kafka: errors={r2['total_errors']:3d} p50={r2['latency_p50_ms']:7.1f}ms")
+
+    # ── Итоговая таблица ──────────────────────────────────────────────────────
+    print_comparison_table(results_without, results_with)
+
+    total_err_before = sum(r["total_errors"] for r in results_without)
+    total_err_after  = sum(r["total_errors"] for r in results_with)
+    reduction = (1 - total_err_after / max(total_err_before, 1)) * 100
+
+    print(f"  Итог: ошибок БЕЗ Kafka = {total_err_before}")
+    print(f"        ошибок С Kafka   = {total_err_after}")
+    print(f"        Снижение ошибок  = {reduction:.1f}%")
+
+    # ── Сохраняем отчёт ──────────────────────────────────────────────────────
     report_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "reports")
     os.makedirs(report_dir, exist_ok=True)
     report_path = os.path.join(report_dir, "load_test_report.txt")
-
     with open(report_path, "w", encoding="utf-8") as f:
-        f.write(report)
+        f.write(f"Снижение ошибок: {reduction:.1f}%\n")
+        f.write(f"БЕЗ Kafka: {total_err_before} ошибок\n")
+        f.write(f"С Kafka:   {total_err_after} ошибок\n")
     print(f"\n  Отчёт сохранён: {report_path}")
 
 

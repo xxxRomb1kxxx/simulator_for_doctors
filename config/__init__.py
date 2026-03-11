@@ -17,6 +17,15 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO")
     debug: bool = Field(default=False)
 
+    kafka_bootstrap_servers: str = Field(
+        default="localhost:9092",
+        description="Адрес Kafka. В Docker: kafka:9092",
+    )
+    kafka_enabled: bool = Field(
+        default=True,
+        description="false — отключить Kafka для локальной разработки",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
